@@ -1,4 +1,4 @@
-# Voxel-Engine (TearDown Clone)
+# Voxel-Engine
 
 A high-performance, multithreaded C++ voxel engine featuring infinite procedural terrain, dynamic destruction, and physics simulation.
 
