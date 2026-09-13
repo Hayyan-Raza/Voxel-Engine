@@ -342,11 +342,24 @@ static void generationWorker() {
 
                     localSetVoxel(x, 0, z, 3); // Bedrock
                     for (int y = 1; y < height - 2; y++) {
-                        localSetVoxel(x, y, z, 15); // Stone
+                        uint32_t hash = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+                        uint8_t stoneType = 15; // Darker Stone shade
+                        int mod = hash % 100;
+                        if (mod < 15) stoneType = 3; // Stone
+                        else if (mod < 30) stoneType = 16; // Lighter Stone shade
+                        
+                        localSetVoxel(x, y, z, stoneType); 
                     }
                     localSetVoxel(x, height - 2, z, 2); // Dirt
                     localSetVoxel(x, height - 1, z, 2); // Dirt
-                    localSetVoxel(x, height, z, 1); // Grass
+                    
+                    uint32_t grassHash = (x * 73856093) ^ (height * 19349663) ^ (z * 83492791);
+                    uint8_t grassType = 1; // Vibrant Green
+                    int gMod = grassHash % 100;
+                    if (gMod < 15) grassType = 13; // Dark Olive
+                    else if (gMod < 30) grassType = 14; // Bright Lime
+                    
+                    localSetVoxel(x, height, z, grassType);
                 }
             }
         }
