@@ -73,7 +73,13 @@ bool Engine::init() {
     std::cout << "Generating terrain..." << std::endl;
     generateTerrain();
 
-    updateStaticMesh(cameraPos, maxRenderDistance);
+    // Set spawn chunk position based on camera position
+    spawnChunkPos = glm::ivec2(
+        (int)(cameraPos.x / (CHUNK_SIZE * voxelSize)),
+        (int)(cameraPos.z / (CHUNK_SIZE * voxelSize))
+    );
+
+    updateStaticMesh(cameraPos);
 
     
     
@@ -83,10 +89,10 @@ bool Engine::init() {
     renderPipeline.init(800, 600);
 
     float loadStartTime = glfwGetTime();
-    while (activeStaticMeshes.size() < 4000 && (glfwGetTime() - loadStartTime < 10.0f) && !glfwWindowShouldClose(window)) {
+    while (isTerrainGenerating() && (glfwGetTime() - loadStartTime < 15.0f) && !glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        updateStaticMesh(cameraPos, maxRenderDistance);
-        uiManager.renderLoadingScreenMeshes(window, activeStaticMeshes.size(), 4000);
+        updateStaticMesh(cameraPos);
+        uiManager.renderLoadingScreenMeshes(window, activeStaticMeshes.size(), 0);
     }
 
     isInitialLoading = false;
@@ -101,7 +107,7 @@ bool Engine::init() {
 
 
 void Engine::updateGameLogic() {
-    updateStaticMesh(cameraPos, maxRenderDistance);
+    updateStaticMesh(cameraPos);
     processIslandResults();
     processInput(window); 
     

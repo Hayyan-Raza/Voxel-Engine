@@ -32,7 +32,7 @@ void drawConfigMenu(GLFWwindow* window) {
     ImGui::SliderFloat("FOV", &fieldOfView, 30.0f, 120.0f);
     ImGui::Separator();
     ImGui::Text("Environment");
-    ImGui::SliderFloat("Render Distance", &maxRenderDistance, 32.0f, 512.0f);
+    ImGui::SliderInt("Render Distance (Chunks)", &renderDistanceChunks, 0, 16);
     ImGui::Checkbox("Enable Sun/Moon", &enableSunMoon);
     
     ImGui::Checkbox("Enable Directional Light", &enableDirLight);

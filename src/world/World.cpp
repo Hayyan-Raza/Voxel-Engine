@@ -126,6 +126,8 @@ void markChunkDirty(int x, int y, int z) {
         ChunkMesh& cm = chunkMeshes[cX][cY][cZ];
         cm.isDirty = true;
         cm.cx = cX; cm.cy = cY; cm.cz = cZ;
+        cm.minAABB = glm::vec3(cX * CHUNK_SIZE * voxelSize, cY * CHUNK_SIZE * voxelSize, cZ * CHUNK_SIZE * voxelSize);
+        cm.maxAABB = glm::vec3((cX + 1) * CHUNK_SIZE * voxelSize, (cY + 1) * CHUNK_SIZE * voxelSize, (cZ + 1) * CHUNK_SIZE * voxelSize);
         if (!cm.isDirtyListed) {
             std::lock_guard<std::mutex> lock(dirtyChunksMutex);
             if (!cm.isDirtyListed) {
@@ -219,7 +221,7 @@ void rebuildChunkSync(int cx, int cy, int cz) {
     }
 }
 
-void updateStaticMesh(glm::vec3 cameraPos, float maxRenderDistance) {
+void updateStaticMesh(glm::vec3 cameraPos) {
 
     std::vector<ChunkMesh*> localDirtyChunks;
     {

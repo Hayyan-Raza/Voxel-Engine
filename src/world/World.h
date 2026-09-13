@@ -35,7 +35,7 @@ void markAllChunksDirty();
 void generateTerrain(unsigned int seed = 2342342547);
 
 // Mesh operations
-void updateStaticMesh(glm::vec3 cameraPos, float maxRenderDistance);
+void updateStaticMesh(glm::vec3 cameraPos);
 void markChunkDirty(int x, int y, int z);
 void rebuildChunkSync(int cx, int cy, int cz);
 

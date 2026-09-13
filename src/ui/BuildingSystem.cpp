@@ -354,7 +354,7 @@ void BuildingSystem::PlaceShape(int material) {
         default: GenerateBox(center, extents, material); break;
     }
     
-    updateStaticMesh(glm::vec3(0,0,0), 1000.0f);
+    updateStaticMesh(glm::vec3(0,0,0));
 }
 
 void BuildingSystem::GenerateBox(const glm::ivec3& center, const glm::ivec3& extents, int material) {

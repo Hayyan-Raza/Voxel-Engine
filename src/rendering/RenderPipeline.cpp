@@ -10,6 +10,7 @@
 #include "../world/World.h"
 #include "../rendering/WeaponModels.h"
 #include "../player/Weapons.h"
+#include <algorithm>
 
 extern void drawChunks(GLint modelLoc, GLint colorLoc, GLint shadowLoc, GLuint VAO);
 extern void drawGhostBlock(GLint modelLoc, GLint colorLoc, GLuint cubeVAO);
@@ -240,8 +241,15 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     glm::mat4 model = glm::mat4(1.0f);
     glUniformMatrix4fv(shadowLocs.model, 1, GL_FALSE, glm::value_ptr(model));
 
+    int pcx = cameraPos.x / (CHUNK_SIZE * voxelSize);
+    int pcz = cameraPos.z / (CHUNK_SIZE * voxelSize);
+
     for (ChunkMesh* cmPtr : activeStaticMeshes) {
         ChunkMesh& cm = *cmPtr;
+        bool isSpawn = (cm.cx == spawnChunkPos.x && cm.cz == spawnChunkPos.y);
+        int dist = std::abs(cm.cx - pcx) + std::abs(cm.cz - pcz);
+        if (!isSpawn && dist > renderDistanceChunks) continue;
+
         glm::vec3 chunkCenter = cm.minAABB + glm::vec3((CHUNK_SIZE * voxelSize) / 2.0f);
         // Use squared distance to avoid sqrt
         glm::vec2 diff(chunkCenter.x - lightTarget.x, chunkCenter.z - lightTarget.z);
@@ -323,6 +331,10 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
 
     for (ChunkMesh* cmPtr : activeStaticMeshes) {
         ChunkMesh& cm = *cmPtr;
+        bool isSpawn = (cm.cx == spawnChunkPos.x && cm.cz == spawnChunkPos.y);
+        int dist = std::abs(cm.cx - pcx) + std::abs(cm.cz - pcz);
+        if (!isSpawn && dist > renderDistanceChunks) continue;
+
         if (viewFrustum.isBoxVisible(cm.minAABB, cm.maxAABB)) {
             glBindVertexArray(cm.VAO);
             glDrawArrays(GL_TRIANGLES, 0, cm.vertexCount);

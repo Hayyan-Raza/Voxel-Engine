@@ -162,7 +162,11 @@ void UIManager::renderLoadingScreenMeshes(GLFWwindow* window, int loadedMeshes, 
     ImGui::SetWindowFontScale(1.5f);
     ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Generating World...");
     ImGui::SetWindowFontScale(1.0f);
-    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Meshes loaded: %d / %d", loadedMeshes, maxMeshes);
+    if (maxMeshes > 0) {
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Meshes loaded: %d / %d", loadedMeshes, maxMeshes);
+    } else {
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Meshes loaded: %d", loadedMeshes);
+    }
     ImGui::End();
     
     ImGui::Render();

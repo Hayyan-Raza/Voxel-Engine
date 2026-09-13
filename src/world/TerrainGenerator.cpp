@@ -22,6 +22,11 @@ static std::thread decoratorThread;
 static std::atomic<int> columnsRemaining(0);
 static unsigned int globalSeed = 0;
 
+bool isTerrainGenerating() {
+    return columnsRemaining > 0;
+}
+
+
 static void generateVoxelGrassBush(int cx, int baseY, int cz) {
     const int numBlades = 16 + (rand() % 8);
     for (int i = 0; i < numBlades; i++) {
@@ -345,13 +350,34 @@ void stopGenerationThreads() {
 void generateTerrain(unsigned int seed) {
     clearWorld();
     globalSeed = seed;
+    std::cout << "Generating terrain..." << std::endl;
 
+    // Pre-initialize all chunk meshes so they have valid bounds and indices
+    for (int cx = 0; cx < CHUNKS_PER_AXIS; cx++) {
+        for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
+            for (int cz = 0; cz < CHUNKS_PER_AXIS; cz++) {
+                ChunkMesh& cm = chunkMeshes[cx][cy][cz];
+                cm.cx = cx; cm.cy = cy; cm.cz = cz;
+                cm.minAABB = glm::vec3(cx * CHUNK_SIZE * voxelSize, cy * CHUNK_SIZE * voxelSize, cz * CHUNK_SIZE * voxelSize);
+                cm.maxAABB = glm::vec3((cx + 1) * CHUNK_SIZE * voxelSize, (cy + 1) * CHUNK_SIZE * voxelSize, (cz + 1) * CHUNK_SIZE * voxelSize);
+            }
+        }
+    }
+
+    worldGenerationId++;
     {
         std::lock_guard<std::mutex> lock(genMutex);
         std::vector<glm::ivec2> spawnOrder;
         int center = CHUNKS_PER_AXIS / 2;
-        spawnOrder.push_back({center, center});
-        columnsRemaining = 1;
+        int radius = 6; // 12x12 chunk grid around center (144 columns)
+        
+        for (int x = center - radius; x <= center + radius; x++) {
+            for (int z = center - radius; z <= center + radius; z++) {
+                spawnOrder.push_back({x, z});
+            }
+        }
+        
+        columnsRemaining = spawnOrder.size();
 
         for (const auto& task : spawnOrder) {
             genQueue.push(task);

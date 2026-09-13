@@ -85,7 +85,8 @@ extern float waterSkyBlend;
 extern float waterWaveSpeed;
 extern float vegetationSwaySpeed;
 extern float vegetationSwayIntensity;
-extern float maxRenderDistance;
+extern int renderDistanceChunks;
+extern glm::ivec2 spawnChunkPos;
 
 // ---- Post Processing Globals ----
 extern float vAOScale;

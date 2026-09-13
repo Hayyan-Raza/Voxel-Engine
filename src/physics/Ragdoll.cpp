@@ -140,7 +140,7 @@ void updateRagdolls(float dt) {
                             }
                         }
                     }
-                    updateStaticMesh(glm::vec3(0,0,0), 1000.0f);
+                    updateStaticMesh(glm::vec3(0,0,0));
                     if (!stabilityNodes.empty()) detectIslands(stabilityNodes);
                 }
 

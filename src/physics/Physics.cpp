@@ -406,7 +406,7 @@ void triggerExplosion(glm::vec3 pos) {
     }
 
     // 4. Update the static chunk meshes and process island stability
-    updateStaticMesh(glm::vec3(0,0,0), 1000.0f);
+    updateStaticMesh(glm::vec3(0,0,0));
 
     std::sort(adjacentNodes.begin(), adjacentNodes.end());
     adjacentNodes.erase(std::unique(adjacentNodes.begin(), adjacentNodes.end()), adjacentNodes.end());

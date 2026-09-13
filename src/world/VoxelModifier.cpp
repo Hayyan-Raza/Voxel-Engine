@@ -81,7 +81,7 @@ void applyTerrainDestruction(const glm::ivec3& hitVox, const glm::vec3& hitWorld
         }
     }
 
-    updateStaticMesh(glm::vec3(0,0,0), 1000.0f);
+    updateStaticMesh(glm::vec3(0,0,0));
     if (!stabilityNodes.empty()) detectIslands(stabilityNodes);
     spawnDust(hitWorldPos, 1, hitVType);
     if (hitVType == 3) spawnSparks(hitWorldPos, 1);
@@ -125,6 +125,6 @@ void extractTerrainToChunk(const glm::ivec3& hitVox, const glm::vec3& pullDir) {
         debrisChunk.id = nextChunkId++; activeChunks.push_back(std::move(debrisChunk));
     }
 
-    updateStaticMesh(glm::vec3(0,0,0), 1000.0f);
+    updateStaticMesh(glm::vec3(0,0,0));
     if (!stabilityNodes.empty()) detectIslands(stabilityNodes);
 }
