@@ -28,7 +28,7 @@ void applyTerrainDestruction(const glm::ivec3& hitVox, const glm::vec3& hitWorld
                 }
 
                 int gx = hitVox.x + dx, gy = hitVox.y + dy, gz = hitVox.z + dz;
-                if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE || gz < 0 || gz >= GRID_SIZE) continue;
+                if (gy < 0 || gy >= WORLD_HEIGHT) continue;
                 uint8_t vType = getVoxel(gx, gy, gz);
                 if (vType == 3 && gy <= 8) continue; // Bedrock protection
                 if (vType == 8) continue; // Ignore water
@@ -42,7 +42,7 @@ void applyTerrainDestruction(const glm::ivec3& hitVox, const glm::vec3& hitWorld
                     const int nb[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
                     for (int i = 0; i < 6; i++) {
                         int nx = gx + nb[i][0], ny = gy + nb[i][1], nz = gz + nb[i][2];
-                        if (nx>=0&&nx<GRID_SIZE&&ny>=0&&ny<GRID_SIZE&&nz>=0&&nz<GRID_SIZE&&getVoxel(nx, ny, nz)>0)
+                        if (ny >= 0 && ny < WORLD_HEIGHT && getVoxel(nx, ny, nz) > 0)
                             stabilityNodes.push_back(glm::ivec3(nx,ny,nz));
                     }
                     setVoxel(gx, gy, gz, 0);
@@ -102,7 +102,7 @@ void extractTerrainToChunk(const glm::ivec3& hitVox, const glm::vec3& pullDir) {
         const int nb[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
         for (int i = 0; i < 6; i++) {
             int nx = hitVox.x + nb[i][0], ny = hitVox.y + nb[i][1], nz = hitVox.z + nb[i][2];
-            if (nx>=0&&nx<GRID_SIZE&&ny>=0&&ny<GRID_SIZE&&nz>=0&&nz<GRID_SIZE&&getVoxel(nx, ny, nz)>0)
+            if (ny >= 0 && ny < WORLD_HEIGHT && getVoxel(nx, ny, nz) > 0)
                 stabilityNodes.push_back(glm::ivec3(nx,ny,nz));
         }
         setVoxel(hitVox.x, hitVox.y, hitVox.z, 0);

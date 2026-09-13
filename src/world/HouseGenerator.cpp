@@ -4,7 +4,7 @@
 #include <algorithm>
 
 inline void setSafeVoxel(int x, int y, int z, uint8_t type) {
-    if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && z >= 0 && z < GRID_SIZE)
+    if (y >= 0 && y < WORLD_HEIGHT)
         setVoxel(x, y, z, type);
 }
 

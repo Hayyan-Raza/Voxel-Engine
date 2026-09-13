@@ -8,6 +8,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <unordered_set>
+#include "../world/ChunkManager.h"
 
 std::queue<std::vector<glm::ivec3>> islandTaskQueue;
 std::mutex islandTaskMutex;
@@ -21,8 +22,8 @@ std::thread islandWorkerThread;
 
 void islandWorker() {
     const int PERFORMANCE_THRESHOLD = 80000;
-    std::unordered_map<int, uint8_t> nodeStatus;
-    std::unordered_set<int> clearedVoxels;
+    std::unordered_map<glm::ivec3, uint8_t, ivec3_hash> nodeStatus;
+    std::unordered_set<glm::ivec3, ivec3_hash> clearedVoxels;
 
     while (islandThreadRunning) {
         std::vector<glm::ivec3> startNodes;
@@ -40,19 +41,16 @@ void islandWorker() {
         clearedVoxels.clear();
 
         for (const auto& startPos : startNodes) {
-            if (startPos.x < 0 || startPos.x >= GRID_SIZE || 
-                startPos.y < 0 || startPos.y >= GRID_SIZE || 
-                startPos.z < 0 || startPos.z >= GRID_SIZE) continue;
+            if (startPos.y < 0 || startPos.y >= WORLD_HEIGHT) continue;
 
-            int startIdx = startPos.x * GRID_SIZE * GRID_SIZE + startPos.y * GRID_SIZE + startPos.z;
             uint8_t voxelType = getVoxel(startPos.x, startPos.y, startPos.z);
-            if (voxelType == 0 || voxelType == 8 || clearedVoxels.count(startIdx)) continue;
-            if (nodeStatus[startIdx] != 0) continue;
+            if (voxelType == 0 || voxelType == 8 || clearedVoxels.count(startPos)) continue;
+            if (nodeStatus[startPos] != 0) continue;
 
             std::vector<glm::ivec3> cluster;
             std::vector<glm::ivec3> queue;
             queue.push_back(startPos);
-            nodeStatus[startIdx] = 2;
+            nodeStatus[startPos] = 2;
 
             bool isStatic = false;
             size_t head = 0;
@@ -67,11 +65,10 @@ void islandWorker() {
                 const int nb[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
                 for (const auto& d : nb) {
                     glm::ivec3 n(p.x + d[0], p.y + d[1], p.z + d[2]);
-                    if (n.x < 0 || n.x >= GRID_SIZE || n.y < 0 || n.y >= GRID_SIZE || n.z < 0 || n.z >= GRID_SIZE) continue;
-                    int nIdx = n.x * GRID_SIZE * GRID_SIZE + n.y * GRID_SIZE + n.z;
+                    if (n.y < 0 || n.y >= WORLD_HEIGHT) continue;
                     
-                    if (getVoxel(n.x, n.y, n.z) > 0 && getVoxel(n.x, n.y, n.z) != 8 && !clearedVoxels.count(nIdx) && nodeStatus[nIdx] == 0) {
-                        nodeStatus[nIdx] = 2;
+                    if (getVoxel(n.x, n.y, n.z) > 0 && getVoxel(n.x, n.y, n.z) != 8 && !clearedVoxels.count(n) && nodeStatus[n] == 0) {
+                        nodeStatus[n] = 2;
                         queue.push_back(n);
                     }
                 }
@@ -79,8 +76,7 @@ void islandWorker() {
 
             if (isStatic) {
                 for (const auto& v : cluster) {
-                    int idx = v.x * GRID_SIZE * GRID_SIZE + v.y * GRID_SIZE + v.z;
-                    nodeStatus[idx] = 1;
+                    nodeStatus[v] = 1;
                 }
                 continue;
             }
@@ -94,9 +90,8 @@ void islandWorker() {
             DetachedIsland island;
             island.center = centroid;
             for (const auto& v : cluster) {
-                int idx = v.x * GRID_SIZE * GRID_SIZE + v.y * GRID_SIZE + v.z;
                 island.voxels.push_back({v, getVoxel(v.x, v.y, v.z)});
-                clearedVoxels.insert(idx); // Prevent duplicate detection
+                clearedVoxels.insert(v); // Prevent duplicate detection
             }
             localResults.push_back(std::move(island));
         }

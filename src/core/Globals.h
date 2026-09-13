@@ -88,6 +88,10 @@ extern float vegetationSwayIntensity;
 extern int renderDistanceChunks;
 extern glm::ivec2 spawnChunkPos;
 
+#include <atomic>
+extern std::atomic<int> playerCurrentChunkX;
+extern std::atomic<int> playerCurrentChunkZ;
+
 // ---- Post Processing Globals ----
 extern float vAOScale;
 extern float vBloom;

@@ -49,7 +49,7 @@ bool checkPartVoxelCollision(const RagdollPart& part, const glm::vec3& testPos, 
             continue;
         }
 
-        if (gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE && gz >= 0 && gz < GRID_SIZE) {
+        if (gy >= 0 && gy < WORLD_HEIGHT) {
             if (getVoxel(gx, gy, gz) > 0) {
                 avgNormal += glm::vec3(0.0f, 1.0f, 0.0f);
                 count++;
@@ -113,7 +113,7 @@ void updateRagdolls(float dt) {
                         for (int dy = -demolishR; dy <= demolishR; dy++) {
                             for (int dz = -demolishR; dz <= demolishR; dz++) {
                                 int tx = gx + dx, ty = gy + dy, tz = gz + dz;
-                                if (tx < 0 || tx >= GRID_SIZE || ty < 0 || ty >= GRID_SIZE || tz < 0 || tz >= GRID_SIZE) continue;
+                                if (ty < 0 || ty >= WORLD_HEIGHT) continue;
                                 if (getVoxel(tx, ty, tz) == 3 && ty <= 8) continue; // Bedrock protection
                                 if (getVoxel(tx, ty, tz) > 0) {
                                     uint8_t vType = getVoxel(tx, ty, tz);
@@ -131,7 +131,7 @@ void updateRagdolls(float dt) {
                                     const int nb[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
                                     for (int i = 0; i < 6; i++) {
                                         int nx = tx + nb[i][0], ny = ty + nb[i][1], nz = tz + nb[i][2];
-                                        if (nx>=0&&nx<GRID_SIZE&&ny>=0&&ny<GRID_SIZE&&nz>=0&&nz<GRID_SIZE&&getVoxel(nx, ny, nz)>0)
+                                        if (ny >= 0 && ny < WORLD_HEIGHT && getVoxel(nx, ny, nz) > 0)
                                             stabilityNodes.push_back(glm::ivec3(nx,ny,nz));
                                     }
                                     setVoxel(tx, ty, tz, 0);

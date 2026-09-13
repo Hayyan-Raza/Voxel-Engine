@@ -82,7 +82,7 @@ RaycastResult performWeaponRaycast(const glm::vec3& startPt, const glm::vec3& ra
         glm::ivec3 currVox(static_cast<int>(floor(pt.x / voxelSize)), 
                            static_cast<int>(floor(pt.y / voxelSize)), 
                            static_cast<int>(floor(pt.z / voxelSize)));
-        if (currVox.x >= 0 && currVox.x < GRID_SIZE && currVox.y >= 0 && currVox.y < GRID_SIZE && currVox.z >= 0 && currVox.z < GRID_SIZE) {
+        if (currVox.y >= 0 && currVox.y < WORLD_HEIGHT) {
             uint8_t t = getVoxel(currVox.x, currVox.y, currVox.z);
             if (t > 0 && t != 8) {
                 res.hit = true;
@@ -107,7 +107,7 @@ bool performPlacementRaycast(glm::vec3 startPt, glm::vec3 rayDir, float maxReach
                            static_cast<int>(floor(pt.y / voxelSize)), 
                            static_cast<int>(floor(pt.z / voxelSize)));
                            
-        if (currVox.x >= 0 && currVox.x < GRID_SIZE && currVox.y >= 0 && currVox.y < GRID_SIZE && currVox.z >= 0 && currVox.z < GRID_SIZE) {
+        if (currVox.y >= 0 && currVox.y < WORLD_HEIGHT) {
             if (getVoxel(currVox.x, currVox.y, currVox.z) > 0) {
                 if (lastEmptyVox.x != -1) {
                     outPlaceVox = lastEmptyVox;

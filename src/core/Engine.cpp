@@ -41,7 +41,7 @@ bool Engine::init() {
     // --- GLAD ---
     if (gladLoadGL(glfwGetProcAddress) == 0) { std::cerr << "Failed to init GLAD\n"; return false; }
 
-    cameraPos = glm::vec3(GRID_SIZE * voxelSize * 0.5f, 0.4f, GRID_SIZE * voxelSize * 0.5f);
+    cameraPos = glm::vec3(0.0f, 40.0f, 0.0f);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -67,6 +67,7 @@ bool Engine::init() {
     initAudio();
     initIslandThread();
     initGenerationThreads();
+    initSaveThread();
     initLightingThread();
     initMesherThread();
     
@@ -79,6 +80,7 @@ bool Engine::init() {
         (int)(cameraPos.z / (CHUNK_SIZE * voxelSize))
     );
 
+    updateActiveChunks(cameraPos);
     updateStaticMesh(cameraPos);
 
     
@@ -91,6 +93,7 @@ bool Engine::init() {
     float loadStartTime = glfwGetTime();
     while (isTerrainGenerating() && (glfwGetTime() - loadStartTime < 15.0f) && !glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        updateActiveChunks(cameraPos);
         updateStaticMesh(cameraPos);
         uiManager.renderLoadingScreenMeshes(window, activeStaticMeshes.size(), 0);
     }
@@ -107,6 +110,7 @@ bool Engine::init() {
 
 
 void Engine::updateGameLogic() {
+    updateActiveChunks(cameraPos);
     updateStaticMesh(cameraPos);
     processIslandResults();
     processInput(window); 
@@ -186,19 +190,7 @@ void Engine::shutdown() {
     
     
     std::cout << "Cleaning up chunk meshes..." << std::endl;
-    std::vector<GLuint> vaosToDelete;
-    std::vector<GLuint> vbosToDelete;
-    for (int cx = 0; cx < CHUNKS_PER_AXIS; cx++) {
-        for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
-            for (int cz = 0; cz < CHUNKS_PER_AXIS; cz++) {
-                ChunkMesh& cm = chunkMeshes[cx][cy][cz];
-                if (cm.VAO) vaosToDelete.push_back(cm.VAO);
-                if (cm.VBO) vbosToDelete.push_back(cm.VBO);
-            }
-        }
-    }
-    if (!vaosToDelete.empty()) glDeleteVertexArrays(vaosToDelete.size(), vaosToDelete.data());
-    if (!vbosToDelete.empty()) glDeleteBuffers(vbosToDelete.size(), vbosToDelete.data());
+    clearMeshes();
 
     std::cout << "Cleaning up weapon models..." << std::endl;
     cleanupWeaponModels();
@@ -220,6 +212,9 @@ void Engine::shutdown() {
     
     std::cout << "Stopping generation thread..." << std::endl;
     stopGenerationThreads();
+    
+    std::cout << "Stopping save thread..." << std::endl;
+    stopSaveThread();
     
     std::cout << "Terminating GLFW..." << std::endl;
     if (window) {

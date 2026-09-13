@@ -114,10 +114,10 @@ void updatePhysics() {
         int py_feet = static_cast<int>(round((cameraPos.y - playerHeight) / voxelSize));
         int py_legs = static_cast<int>(round((cameraPos.y - playerHeight * 0.5f) / voxelSize));
         bool inWater = false;
-        if (px >= 0 && px < GRID_SIZE && pz >= 0 && pz < GRID_SIZE) {
-            if ((py_feet >= 0 && py_feet < GRID_SIZE && getVoxel(px, py_feet, pz) == 8) ||
-                (py_legs >= 0 && py_legs < GRID_SIZE && getVoxel(px, py_legs, pz) == 8) ||
-                (py >= 0 && py < GRID_SIZE && getVoxel(px, py, pz) == 8)) {
+        {
+            if ((py_feet >= 0 && py_feet < WORLD_HEIGHT && getVoxel(px, py_feet, pz) == 8) ||
+                (py_legs >= 0 && py_legs < WORLD_HEIGHT && getVoxel(px, py_legs, pz) == 8) ||
+                (py >= 0 && py < WORLD_HEIGHT && getVoxel(px, py, pz) == 8)) {
                 inWater = true;
             }
         }
@@ -151,8 +151,8 @@ void updatePhysics() {
         int gx = static_cast<int>(round(cameraPos.x / voxelSize));
         int gz = static_cast<int>(round(cameraPos.z / voxelSize));
         int currentGroundType = 0;
-        if (gx >= 0 && gx < GRID_SIZE && gz >= 0 && gz < GRID_SIZE) {
-            int startY = std::min(GRID_SIZE - 1, static_cast<int>(floor((cameraPos.y - 0.02f) / voxelSize)));
+        {
+            int startY = std::min(WORLD_HEIGHT - 1, static_cast<int>(floor((cameraPos.y - 0.02f) / voxelSize)));
             for (int gy = startY; gy >= 0; gy--) {
                 if (getVoxel(gx, gy, gz) > 0 && getVoxel(gx, gy, gz) != 8) { // Ignore water for grounding
                     currentGroundType = getVoxel(gx, gy, gz);

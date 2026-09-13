@@ -214,7 +214,7 @@ void handleDestruction(GLFWwindow* window) {
         glm::ivec3 placeVox(-1);
         bool hit = performPlacementRaycast(cameraPos, cameraFront, 15.0f, placeVox);
         
-        if (hit && placeVox.x >= 0 && placeVox.x < GRID_SIZE && placeVox.y >= 0 && placeVox.y < GRID_SIZE && placeVox.z >= 0 && placeVox.z < GRID_SIZE) {
+        if (hit && placeVox.y >= 0 && placeVox.y < WORLD_HEIGHT) {
             ghostVox = placeVox;
             showGhostVox = true;
         }

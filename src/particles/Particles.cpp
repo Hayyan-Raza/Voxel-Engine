@@ -255,7 +255,7 @@ void spawnFallingLeaves(glm::vec3 playerPos) {
     int vy = (int)round(ry);
     int vz = (int)round(rz);
     
-    if (vx >= 0 && vx < GRID_SIZE && vy >= 0 && vy < GRID_SIZE && vz >= 0 && vz < GRID_SIZE) {
+    if (vy >= 0 && vy < WORLD_HEIGHT) {
         uint8_t type = getVoxel(vx, vy, vz);
         if (type == 23 || type == 24 || type == 27 || type == 28) {
             Particle p;

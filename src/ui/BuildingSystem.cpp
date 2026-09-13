@@ -117,7 +117,7 @@ void BuildingSystem::HandleClick(bool isLeftDown, bool isRightDown, const glm::v
                                static_cast<int>(floor(pt.y / voxelSize)), 
                                static_cast<int>(floor(pt.z / voxelSize)));
                                
-            if (currVox.x >= 0 && currVox.x < GRID_SIZE && currVox.y >= 0 && currVox.y < GRID_SIZE && currVox.z >= 0 && currVox.z < GRID_SIZE) {
+            if (currVox.y >= 0 && currVox.y < WORLD_HEIGHT) {
                 if (getVoxel(currVox.x, currVox.y, currVox.z) > 0) {
                     hitVox = currVox;
                     hit = true;
@@ -361,7 +361,7 @@ void BuildingSystem::GenerateBox(const glm::ivec3& center, const glm::ivec3& ext
     for (int x = center.x - extents.x; x <= center.x + extents.x; ++x) {
         for (int y = center.y - extents.y; y <= center.y + extents.y; ++y) {
             for (int z = center.z - extents.z; z <= center.z + extents.z; ++z) {
-                if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && z >= 0 && z < GRID_SIZE) {
+                if (y >= 0 && y < WORLD_HEIGHT) {
                     setVoxel(x, y, z, material);
                     markChunkDirty(x, y, z);
                 }
@@ -379,7 +379,7 @@ void BuildingSystem::GenerateSphere(const glm::ivec3& center, const glm::ivec3& 
                 float dz = (z - center.z) / static_cast<float>(extents.z);
                 
                 if (dx*dx + dy*dy + dz*dz <= 1.0f) {
-                    if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && z >= 0 && z < GRID_SIZE) {
+                    if (y >= 0 && y < WORLD_HEIGHT) {
                         setVoxel(x, y, z, material);
                         markChunkDirty(x, y, z);
                     }
@@ -397,7 +397,7 @@ void BuildingSystem::GenerateCylinder(const glm::ivec3& center, const glm::ivec3
                 float dz = (z - center.z) / static_cast<float>(extents.z);
                 
                 if (dx*dx + dz*dz <= 1.0f) {
-                    if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && z >= 0 && z < GRID_SIZE) {
+                    if (y >= 0 && y < WORLD_HEIGHT) {
                         setVoxel(x, y, z, material);
                         markChunkDirty(x, y, z);
                     }
@@ -416,7 +416,7 @@ void BuildingSystem::GeneratePyramid(const glm::ivec3& center, const glm::ivec3&
         
         for (int x = center.x - curExtentsX; x <= center.x + curExtentsX; ++x) {
             for (int z = center.z - curExtentsZ; z <= center.z + curExtentsZ; ++z) {
-                if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && z >= 0 && z < GRID_SIZE) {
+                if (y >= 0 && y < WORLD_HEIGHT) {
                     setVoxel(x, y, z, material);
                     markChunkDirty(x, y, z);
                 }

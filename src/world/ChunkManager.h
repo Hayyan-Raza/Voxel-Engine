@@ -5,13 +5,28 @@
 #include <atomic>
 #include <glm/glm.hpp>
 
-#define GRID_SIZE 1024
 #define CHUNK_SIZE 32
-#define CHUNKS_PER_AXIS (GRID_SIZE / CHUNK_SIZE)
+#define WORLD_HEIGHT_CHUNKS 8
+#define WORLD_HEIGHT (WORLD_HEIGHT_CHUNKS * CHUNK_SIZE)
+
+inline int getChunkCoord(int pos) {
+    return pos < 0 ? ((pos + 1) / CHUNK_SIZE) - 1 : pos / CHUNK_SIZE;
+}
+
+inline int getLocalIdx(int pos) {
+    int mod = pos % CHUNK_SIZE;
+    return mod < 0 ? mod + CHUNK_SIZE : mod;
+}
 
 struct ivec3_hash {
     std::size_t operator()(const glm::ivec3& v) const {
         return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1) ^ (std::hash<int>()(v.z) << 2);
+    }
+};
+
+struct ivec2_hash {
+    std::size_t operator()(const glm::ivec2& v) const {
+        return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1);
     }
 };
 

@@ -36,7 +36,7 @@ static void drawThickLine(glm::vec3 start, glm::vec3 end, float thicknessStart, 
                         int fx = px + tx;
                         int fy = py + ty;
                         int fz = pz + tz;
-                        if (fx >= 0 && fx < GRID_SIZE && fy >= 0 && fy < GRID_SIZE && fz >= 0 && fz < GRID_SIZE) {
+                        if (fy >= 0 && fy < WORLD_HEIGHT) {
                             uint8_t barkType = 4;
                             if ((fx * 37 + fy * 19 + fz * 17) % 4 == 0) {
                                 barkType = 20; 
@@ -68,7 +68,7 @@ static void placeTeardownLeaves(int cx, int cy, int cz, float radius, bool isChe
         int fz = cz + (int)(r * sin(phi) * sin(theta));
 
         // Place a SINGLE leaf voxel (maximum airiness)
-        if (fx >= 0 && fx < GRID_SIZE && fy >= 0 && fy < GRID_SIZE && fz >= 0 && fz < GRID_SIZE) {
+        if (fy >= 0 && fy < WORLD_HEIGHT) {
             if (getVoxel(fx, fy, fz) == 0) { 
                 if (isCherry) {
                     setVoxel(fx, fy, fz, (rand() % 3 == 0) ? 28 : 27);
@@ -83,7 +83,7 @@ static void placeTeardownLeaves(int cx, int cy, int cz, float radius, bool isChe
             int nx = fx + (rand() % 3 - 1);
             int ny = fy + (rand() % 3 - 1);
             int nz = fz + (rand() % 3 - 1);
-            if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+            if (ny >= 0 && ny < WORLD_HEIGHT) {
                 if (getVoxel(nx, ny, nz) == 0) {
                     setVoxel(nx, ny, nz, isCherry ? 28 : 23);
                 }

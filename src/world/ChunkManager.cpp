@@ -4,6 +4,8 @@
 #include <mutex>
 #include <atomic>
 
+
+
 std::unordered_map<glm::ivec3, ChunkData*, ivec3_hash> chunkManager;
 std::shared_mutex chunkMutex;
 std::atomic<uint32_t> worldGenerationId = 0;
@@ -17,15 +19,15 @@ thread_local ChunkData* lastLightChunkData = nullptr;
 thread_local uint32_t lastLightGenerationId = 0;
 
 uint8_t getVoxel(int x, int y, int z) {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return 0;
+    if (y < 0 || y >= WORLD_HEIGHT) return 0;
     
-    int cx = x / CHUNK_SIZE;
-    int cy = y / CHUNK_SIZE;
-    int cz = z / CHUNK_SIZE;
+    int cx = getChunkCoord(x);
+    int cy = getChunkCoord(y);
+    int cz = getChunkCoord(z);
     glm::ivec3 key(cx, cy, cz);
     
     if (key == lastVoxelChunkKey && lastVoxelGenerationId == worldGenerationId.load()) {
-        if (lastVoxelChunkData) return lastVoxelChunkData->blocks[x % CHUNK_SIZE][y % CHUNK_SIZE][z % CHUNK_SIZE];
+        if (lastVoxelChunkData) return lastVoxelChunkData->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)];
         return 0;
     }
     
@@ -35,18 +37,18 @@ uint8_t getVoxel(int x, int y, int z) {
     lastVoxelGenerationId = worldGenerationId.load();
     if (it != chunkManager.end()) {
         lastVoxelChunkData = it->second;
-        return lastVoxelChunkData->blocks[x % CHUNK_SIZE][y % CHUNK_SIZE][z % CHUNK_SIZE];
+        return lastVoxelChunkData->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)];
     }
     lastVoxelChunkData = nullptr;
     return 0; // Empty air chunk
 }
 
 void setVoxel(int x, int y, int z, uint8_t type) {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return;
+    if (y < 0 || y >= WORLD_HEIGHT) return;
     
-    int cx = x / CHUNK_SIZE;
-    int cy = y / CHUNK_SIZE;
-    int cz = z / CHUNK_SIZE;
+    int cx = getChunkCoord(x);
+    int cy = getChunkCoord(y);
+    int cz = getChunkCoord(z);
     glm::ivec3 key(cx, cy, cz);
     
     uint8_t oldType = getVoxel(x, y, z);
@@ -58,11 +60,11 @@ void setVoxel(int x, int y, int z, uint8_t type) {
         if (it == chunkManager.end()) {
             if (type == 0) return; // Don't allocate a chunk just for air
             ChunkData* newChunk = new ChunkData();
-            newChunk->blocks[x % CHUNK_SIZE][y % CHUNK_SIZE][z % CHUNK_SIZE] = type;
+            newChunk->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)] = type;
             chunkManager[key] = newChunk;
             worldGenerationId++;
         } else {
-            it->second->blocks[x % CHUNK_SIZE][y % CHUNK_SIZE][z % CHUNK_SIZE] = type;
+            it->second->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)] = type;
         }
     }
 
@@ -77,11 +79,11 @@ void setVoxel(int x, int y, int z, uint8_t type) {
 }
 
 void setVoxelFast(int x, int y, int z, uint8_t type) {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return;
+    if (y < 0 || y >= WORLD_HEIGHT) return;
     
-    int cx = x / CHUNK_SIZE;
-    int cy = y / CHUNK_SIZE;
-    int cz = z / CHUNK_SIZE;
+    int cx = getChunkCoord(x);
+    int cy = getChunkCoord(y);
+    int cz = getChunkCoord(z);
     glm::ivec3 key(cx, cy, cz);
     
     uint8_t oldType = getVoxel(x, y, z);
@@ -92,26 +94,26 @@ void setVoxelFast(int x, int y, int z, uint8_t type) {
     if (it == chunkManager.end()) {
         if (type == 0) return; // Don't allocate a chunk just for air
         ChunkData* newChunk = new ChunkData();
-        newChunk->blocks[x % CHUNK_SIZE][y % CHUNK_SIZE][z % CHUNK_SIZE] = type;
+        newChunk->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)] = type;
         chunkManager[key] = newChunk;
         worldGenerationId++;
     } else {
-        it->second->blocks[x % CHUNK_SIZE][y % CHUNK_SIZE][z % CHUNK_SIZE] = type;
+        it->second->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)] = type;
     }
 }
 
 uint8_t getLight(int x, int y, int z) {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return 0;
+    if (y < 0 || y >= WORLD_HEIGHT) return 0;
     
-    int cx = x / CHUNK_SIZE;
-    int cy = y / CHUNK_SIZE;
-    int cz = z / CHUNK_SIZE;
+    int cx = getChunkCoord(x);
+    int cy = getChunkCoord(y);
+    int cz = getChunkCoord(z);
     glm::ivec3 key(cx, cy, cz);
     
     if (key == lastLightChunkKey && lastLightGenerationId == worldGenerationId.load()) {
         if (lastLightChunkData) {
-            uint8_t packed = lastLightChunkData->lightData[x % CHUNK_SIZE][y % CHUNK_SIZE][(z % CHUNK_SIZE) / 2];
-            return ((z % CHUNK_SIZE) % 2 == 0) ? (packed & 0x0F) : ((packed >> 4) & 0x0F);
+            uint8_t packed = lastLightChunkData->lightData[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z) / 2];
+            return (getLocalIdx(z) % 2 == 0) ? (packed & 0x0F) : ((packed >> 4) & 0x0F);
         }
         return 0;
     }
@@ -122,19 +124,19 @@ uint8_t getLight(int x, int y, int z) {
     lastLightGenerationId = worldGenerationId.load();
     if (it != chunkManager.end()) {
         lastLightChunkData = it->second;
-        uint8_t packed = lastLightChunkData->lightData[x % CHUNK_SIZE][y % CHUNK_SIZE][(z % CHUNK_SIZE) / 2];
-        return ((z % CHUNK_SIZE) % 2 == 0) ? (packed & 0x0F) : ((packed >> 4) & 0x0F);
+        uint8_t packed = lastLightChunkData->lightData[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z) / 2];
+        return (getLocalIdx(z) % 2 == 0) ? (packed & 0x0F) : ((packed >> 4) & 0x0F);
     }
     lastLightChunkData = nullptr;
     return 0; 
 }
 
 void setLight(int x, int y, int z, uint8_t val) {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return;
+    if (y < 0 || y >= WORLD_HEIGHT) return;
     
-    int cx = x / CHUNK_SIZE;
-    int cy = y / CHUNK_SIZE;
-    int cz = z / CHUNK_SIZE;
+    int cx = getChunkCoord(x);
+    int cy = getChunkCoord(y);
+    int cz = getChunkCoord(z);
     glm::ivec3 key(cx, cy, cz);
     
     std::unique_lock<std::shared_mutex> lock(chunkMutex);
@@ -142,9 +144,9 @@ void setLight(int x, int y, int z, uint8_t val) {
     if (it == chunkManager.end()) {
         if (val == 0) return; // Don't allocate a chunk just for 0 light
         ChunkData* newChunk = new ChunkData();
-        int lx = x % CHUNK_SIZE;
-        int ly = y % CHUNK_SIZE;
-        int lz = z % CHUNK_SIZE;
+        int lx = getLocalIdx(x);
+        int ly = getLocalIdx(y);
+        int lz = getLocalIdx(z);
         if (lz % 2 == 0) {
             newChunk->lightData[lx][ly][lz / 2] = (newChunk->lightData[lx][ly][lz / 2] & 0xF0) | (val & 0x0F);
         } else {
@@ -153,9 +155,9 @@ void setLight(int x, int y, int z, uint8_t val) {
         chunkManager[key] = newChunk;
         worldGenerationId++;
     } else {
-        int lx = x % CHUNK_SIZE;
-        int ly = y % CHUNK_SIZE;
-        int lz = z % CHUNK_SIZE;
+        int lx = getLocalIdx(x);
+        int ly = getLocalIdx(y);
+        int lz = getLocalIdx(z);
         if (lz % 2 == 0) {
             it->second->lightData[lx][ly][lz / 2] = (it->second->lightData[lx][ly][lz / 2] & 0xF0) | (val & 0x0F);
         } else {

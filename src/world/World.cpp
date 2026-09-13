@@ -14,34 +14,59 @@
 #include <cstring>
 #include <shared_mutex>
 #include <algorithm>
+#include <unordered_set>
 #include "GreedyMesher.h"
 #include "TerrainGenerator.h"
 #include "Lighting.h"
 
 float voxelSize = 0.05f; // Vast land scale!
-ChunkMesh chunkMeshes[CHUNKS_PER_AXIS][CHUNKS_PER_AXIS][CHUNKS_PER_AXIS];
+std::unordered_map<glm::ivec3, ChunkMesh*, ivec3_hash> chunkMeshes;
+std::mutex meshMapMutex;
+
+ChunkMesh* getChunkMesh(int cx, int cy, int cz) {
+    glm::ivec3 key(cx, cy, cz);
+    std::lock_guard<std::mutex> lock(meshMapMutex);
+    auto it = chunkMeshes.find(key);
+    if (it != chunkMeshes.end()) return it->second;
+    ChunkMesh* cm = new ChunkMesh();
+    cm->cx = cx; cm->cy = cy; cm->cz = cz;
+    cm->minAABB = glm::vec3(cx * CHUNK_SIZE * voxelSize, cy * CHUNK_SIZE * voxelSize, cz * CHUNK_SIZE * voxelSize);
+    cm->maxAABB = glm::vec3((cx + 1) * CHUNK_SIZE * voxelSize, (cy + 1) * CHUNK_SIZE * voxelSize, (cz + 1) * CHUNK_SIZE * voxelSize);
+    chunkMeshes[key] = cm;
+    return cm;
+}
+
+void clearMeshes() {
+    std::lock_guard<std::mutex> lock(meshMapMutex);
+    std::lock_guard<std::mutex> lock2(dirtyChunksMutex);
+    for (auto& pair : chunkMeshes) {
+        ChunkMesh* cm = pair.second;
+        if (cm->VAO) glDeleteVertexArrays(1, &cm->VAO);
+        if (cm->VBO) glDeleteBuffers(1, &cm->VBO);
+        if (cm->waterVAO) glDeleteVertexArrays(1, &cm->waterVAO);
+        if (cm->waterVBO) glDeleteBuffers(1, &cm->waterVBO);
+        delete cm;
+    }
+    chunkMeshes.clear();
+    dirtyChunks.clear();
+    activeStaticMeshes.clear();
+    activeWaterMeshes.clear();
+}
 
 void markAllChunksDirty() {
-    for (int cx = 0; cx < CHUNKS_PER_AXIS; cx++) {
-        for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
-            for (int cz = 0; cz < CHUNKS_PER_AXIS; cz++) {
-                ChunkMesh& cm = chunkMeshes[cx][cy][cz];
-                cm.isDirty = true;
-                cm.isMeshing = false;
-                cm.isDirtyListed = true;
-                cm.isActiveStatic = false;
-                cm.isActiveWater = false;
-                cm.isMeshedOnce = false;
-                cm.cx = cx; cm.cy = cy; cm.cz = cz;
-                
-                cm.minAABB = glm::vec3(cx * CHUNK_SIZE * voxelSize, cy * CHUNK_SIZE * voxelSize, cz * CHUNK_SIZE * voxelSize);
-                cm.maxAABB = glm::vec3((cx + 1) * CHUNK_SIZE * voxelSize, (cy + 1) * CHUNK_SIZE * voxelSize, (cz + 1) * CHUNK_SIZE * voxelSize);
-                
-                {
-                    std::lock_guard<std::mutex> lock(dirtyChunksMutex);
-                    dirtyChunks.push_back(&cm);
-                }
-            }
+    std::lock_guard<std::mutex> lock(meshMapMutex);
+    for (auto& pair : chunkMeshes) {
+        ChunkMesh* cm = pair.second;
+        cm->isDirty = true;
+        cm->isMeshing = false;
+        cm->isDirtyListed = true;
+        cm->isActiveStatic = false;
+        cm->isActiveWater = false;
+        cm->isMeshedOnce = false;
+        
+        {
+            std::lock_guard<std::mutex> lock2(dirtyChunksMutex);
+            dirtyChunks.push_back(cm);
         }
     }
 }
@@ -95,7 +120,7 @@ static void mesherWorker() {
 
 void initMesherThread() {
     mesherRunning = true;
-    unsigned int numThreads = std::max(1u, std::thread::hardware_concurrency() - 2);
+    unsigned int numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
     for (unsigned int i = 0; i < numThreads; i++) {
         mesherThreads.emplace_back(mesherWorker);
     }
@@ -117,22 +142,19 @@ void stopMesherThread() {
 
 // --- Public API ---
 void markChunkDirty(int x, int y, int z) {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return;
-    int cx = x / CHUNK_SIZE;
-    int cy = y / CHUNK_SIZE;
-    int cz = z / CHUNK_SIZE;
+    if (y < 0 || y >= WORLD_HEIGHT) return;
+    int cx = getChunkCoord(x);
+    int cy = getChunkCoord(y);
+    int cz = getChunkCoord(z);
     
     auto mark = [&](int cX, int cY, int cZ) {
-        ChunkMesh& cm = chunkMeshes[cX][cY][cZ];
-        cm.isDirty = true;
-        cm.cx = cX; cm.cy = cY; cm.cz = cZ;
-        cm.minAABB = glm::vec3(cX * CHUNK_SIZE * voxelSize, cY * CHUNK_SIZE * voxelSize, cZ * CHUNK_SIZE * voxelSize);
-        cm.maxAABB = glm::vec3((cX + 1) * CHUNK_SIZE * voxelSize, (cY + 1) * CHUNK_SIZE * voxelSize, (cZ + 1) * CHUNK_SIZE * voxelSize);
-        if (!cm.isDirtyListed) {
+        ChunkMesh* cm = getChunkMesh(cX, cY, cZ);
+        cm->isDirty = true;
+        if (!cm->isDirtyListed) {
             std::lock_guard<std::mutex> lock(dirtyChunksMutex);
-            if (!cm.isDirtyListed) {
-                cm.isDirtyListed = true;
-                dirtyChunks.push_back(&cm);
+            if (!cm->isDirtyListed) {
+                cm->isDirtyListed = true;
+                dirtyChunks.push_back(cm);
             }
         }
     };
@@ -140,17 +162,18 @@ void markChunkDirty(int x, int y, int z) {
     mark(cx, cy, cz);
 
     // Check borders to dirty neighbors
-    if (x % CHUNK_SIZE == 0 && cx > 0) mark(cx - 1, cy, cz);
-    if (x % CHUNK_SIZE == CHUNK_SIZE - 1 && cx < CHUNKS_PER_AXIS - 1) mark(cx + 1, cy, cz);
-    if (y % CHUNK_SIZE == 0 && cy > 0) mark(cx, cy - 1, cz);
-    if (y % CHUNK_SIZE == CHUNK_SIZE - 1 && cy < CHUNKS_PER_AXIS - 1) mark(cx, cy + 1, cz);
-    if (z % CHUNK_SIZE == 0 && cz > 0) mark(cx, cy, cz - 1);
-    if (z % CHUNK_SIZE == CHUNK_SIZE - 1 && cz < CHUNKS_PER_AXIS - 1) mark(cx, cy, cz + 1);
+    if (getLocalIdx(x) == 0) mark(cx - 1, cy, cz);
+    if (getLocalIdx(x) == CHUNK_SIZE - 1) mark(cx + 1, cy, cz);
+    if (getLocalIdx(y) == 0 && cy > 0) mark(cx, cy - 1, cz);
+    if (getLocalIdx(y) == CHUNK_SIZE - 1 && cy < WORLD_HEIGHT_CHUNKS - 1) mark(cx, cy + 1, cz);
+    if (getLocalIdx(z) == 0) mark(cx, cy, cz - 1);
+    if (getLocalIdx(z) == CHUNK_SIZE - 1) mark(cx, cy, cz + 1);
 }
 
 void rebuildChunkSync(int cx, int cy, int cz) {
-    if (cx < 0 || cx >= CHUNKS_PER_AXIS || cy < 0 || cy >= CHUNKS_PER_AXIS || cz < 0 || cz >= CHUNKS_PER_AXIS) return;
-    ChunkMesh& cm = chunkMeshes[cx][cy][cz];
+    if (cy < 0 || cy >= WORLD_HEIGHT_CHUNKS) return;
+    ChunkMesh* cmp = getChunkMesh(cx, cy, cz);
+    ChunkMesh& cm = *cmp;
     
     // Don't sync rebuild if it's already in progress by background thread
     if (cm.isMeshing) return;
@@ -218,6 +241,113 @@ void rebuildChunkSync(int cx, int cy, int cz) {
         cm.waterVertexCount = waterVertices.size();
     } else {
         cm.waterVertexCount = 0;
+    }
+}
+
+#include "TerrainGenerator.h"
+
+void updateActiveChunks(glm::vec3 cameraPos) {
+    int pcx = getChunkCoord(cameraPos.x / voxelSize);
+    int pcz = getChunkCoord(cameraPos.z / voxelSize);
+    
+    playerCurrentChunkX.store(pcx, std::memory_order_relaxed);
+    playerCurrentChunkZ.store(pcz, std::memory_order_relaxed);
+    
+    std::unordered_set<glm::ivec2, ivec2_hash> desiredColumns;
+    desiredColumns.insert(glm::ivec2(spawnChunkPos.x, spawnChunkPos.y)); // Spawn always active
+
+    for (int dx = -renderDistanceChunks; dx <= renderDistanceChunks; dx++) {
+        for (int dz = -renderDistanceChunks; dz <= renderDistanceChunks; dz++) {
+            if (std::abs(dx) + std::abs(dz) <= renderDistanceChunks) {
+                desiredColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
+            }
+        }
+    }
+
+    std::unordered_set<glm::ivec2, ivec2_hash> currentColumns;
+    {
+        std::shared_lock<std::shared_mutex> lock(chunkMutex);
+        for (auto& pair : chunkManager) {
+            currentColumns.insert(glm::ivec2(pair.first.x, pair.first.z));
+        }
+    }
+
+    // Unload chunks not in desired
+    for (const auto& col : currentColumns) {
+        if (desiredColumns.find(col) == desiredColumns.end()) {
+            SaveTask task;
+            task.cx = col.x;
+            task.cz = col.y;
+            
+            // Remove from chunkManager and detach data
+            {
+                std::unique_lock<std::shared_mutex> lock(chunkMutex);
+                for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+                    glm::ivec3 key(col.x, cy, col.y);
+                    auto it = chunkManager.find(key);
+                    if (it != chunkManager.end()) {
+                        task.chunks[cy] = it->second;
+                        chunkManager.erase(it);
+                    } else {
+                        task.chunks[cy] = nullptr;
+                    }
+                }
+            }
+            
+            queueChunkSave(task);
+            
+            // Remove meshes safely
+            {
+                std::lock_guard<std::mutex> mLock(meshMapMutex);
+                std::lock_guard<std::mutex> dLock(dirtyChunksMutex);
+                for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+                    glm::ivec3 key(col.x, cy, col.y);
+                    auto it = chunkMeshes.find(key);
+                    if (it != chunkMeshes.end()) {
+                        ChunkMesh* cm = it->second;
+                        
+                        // Erase from dirtyChunks
+                        auto dIt = std::find(dirtyChunks.begin(), dirtyChunks.end(), cm);
+                        if (dIt != dirtyChunks.end()) dirtyChunks.erase(dIt);
+                        
+                        // Active vectors
+                        auto smIt = std::find(activeStaticMeshes.begin(), activeStaticMeshes.end(), cm);
+                        if (smIt != activeStaticMeshes.end()) activeStaticMeshes.erase(smIt);
+                        
+                        auto wmIt = std::find(activeWaterMeshes.begin(), activeWaterMeshes.end(), cm);
+                        if (wmIt != activeWaterMeshes.end()) activeWaterMeshes.erase(wmIt);
+                        
+                        if (cm->VAO) glDeleteVertexArrays(1, &cm->VAO);
+                        if (cm->VBO) glDeleteBuffers(1, &cm->VBO);
+                        if (cm->waterVAO) glDeleteVertexArrays(1, &cm->waterVAO);
+                        if (cm->waterVBO) glDeleteBuffers(1, &cm->waterVBO);
+                        
+                        delete cm;
+                        chunkMeshes.erase(it);
+                    }
+                }
+            }
+        }
+    }
+
+    // Load desired columns (sort them so closest are queued first)
+    std::vector<glm::ivec2> chunksToLoad;
+    for (const auto& col : desiredColumns) {
+        if (currentColumns.find(col) == currentColumns.end()) {
+            chunksToLoad.push_back(col);
+        }
+    }
+    
+    if (!chunksToLoad.empty()) {
+        std::sort(chunksToLoad.begin(), chunksToLoad.end(), [pcx, pcz](const glm::ivec2& a, const glm::ivec2& b) {
+            int distA = (a.x - pcx) * (a.x - pcx) + (a.y - pcz) * (a.y - pcz);
+            int distB = (b.x - pcx) * (b.x - pcx) + (b.y - pcz) * (b.y - pcz);
+            return distA < distB; // Ascending order (closest first)
+        });
+        
+        for (const auto& col : chunksToLoad) {
+            queueChunkGeneration(col.x, col.y);
+        }
     }
 }
 
@@ -303,7 +433,8 @@ void updateStaticMesh(glm::vec3 cameraPos) {
     }
 
     for (auto& res : completedMeshes) {
-        ChunkMesh& cm = chunkMeshes[res.cx][res.cy][res.cz];
+        ChunkMesh* cmp = getChunkMesh(res.cx, res.cy, res.cz);
+        ChunkMesh& cm = *cmp;
         cm.isMeshedOnce = true;
         
         if (cm.VAO == 0) glGenVertexArrays(1, &cm.VAO);

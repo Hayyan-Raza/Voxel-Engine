@@ -12,18 +12,112 @@
 #include <shared_mutex>
 #include <iostream>
 #include <atomic>
+#include <fstream>
+#include <filesystem>
+#include <string>
 
-static std::queue<glm::ivec2> genQueue;
+namespace fs = std::filesystem;
+
+#include <unordered_set>
+
+static std::vector<glm::ivec2> genQueue;
+static std::unordered_set<glm::ivec2, ivec2_hash> generatingColumns;
 static std::mutex genMutex;
 static std::condition_variable genCV;
 static bool genRunning = false;
 static std::vector<std::thread> genThreads;
-static std::thread decoratorThread;
 static std::atomic<int> columnsRemaining(0);
 static unsigned int globalSeed = 0;
 
 bool isTerrainGenerating() {
     return columnsRemaining > 0;
+}
+
+void queueChunkGeneration(int cx, int cz) {
+    std::lock_guard<std::mutex> lock(genMutex);
+    glm::ivec2 task(cx, cz);
+    if (generatingColumns.find(task) != generatingColumns.end()) return; // Already generating
+    
+    // Check if already in chunkManager
+    bool alreadyLoaded = false;
+    {
+        std::shared_lock<std::shared_mutex> clock(chunkMutex);
+        if (chunkManager.find(glm::ivec3(cx, 0, cz)) != chunkManager.end()) {
+            alreadyLoaded = true;
+        }
+    }
+    if (alreadyLoaded) return;
+
+    generatingColumns.insert(task);
+    genQueue.push_back(task);
+    columnsRemaining++;
+    genCV.notify_one();
+}
+
+std::queue<SaveTask> saveQueue;
+std::mutex saveMutex;
+std::condition_variable saveCV;
+bool saveRunning = true;
+std::thread saveThread;
+
+void saveWorker() {
+    while (true) {
+        SaveTask task;
+        {
+            std::unique_lock<std::mutex> lock(saveMutex);
+            saveCV.wait(lock, [] { return !saveQueue.empty() || !saveRunning; });
+            if (!saveRunning && saveQueue.empty()) break;
+            task = saveQueue.front();
+            saveQueue.pop();
+        }
+
+        std::string filename = "world_data/col_" + std::to_string(task.cx) + "_" + std::to_string(task.cz) + ".bin";
+        std::ofstream outFile(filename, std::ios::binary);
+        if (outFile.is_open()) {
+            for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+                if (task.chunks[cy] != nullptr) {
+                    uint8_t hasChunk = 1;
+                    outFile.write((char*)&hasChunk, sizeof(hasChunk));
+                    outFile.write((char*)task.chunks[cy], sizeof(ChunkData));
+                } else {
+                    uint8_t hasChunk = 0;
+                    outFile.write((char*)&hasChunk, sizeof(hasChunk));
+                }
+            }
+            outFile.close();
+        }
+
+        // Cleanup memory now that it's saved
+        for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+            if (task.chunks[cy] != nullptr) {
+                delete task.chunks[cy];
+            }
+        }
+    }
+}
+
+void queueChunkSave(const SaveTask& task) {
+    {
+        std::lock_guard<std::mutex> lock(saveMutex);
+        saveQueue.push(task);
+    }
+    saveCV.notify_one();
+}
+
+void initSaveThread() {
+    saveRunning = true;
+    saveThread = std::thread(saveWorker);
+}
+
+void stopSaveThread() {
+    {
+        std::lock_guard<std::mutex> lock(saveMutex);
+        saveRunning = false;
+    }
+    saveCV.notify_all();
+    if (saveThread.joinable()) {
+        saveThread.join();
+    }
 }
 
 
@@ -35,7 +129,7 @@ static void generateVoxelGrassBush(int cx, int baseY, int cz) {
         int bx = cx + (int)round(cos(angle) * radius);
         int bz = cz + (int)round(sin(angle) * radius);
         
-        if (bx < 2 || bx >= GRID_SIZE - 2 || bz < 2 || bz >= GRID_SIZE - 2) continue;
+        if (bx < cx * CHUNK_SIZE || bx >= (cx + 1) * CHUNK_SIZE || bz < cz * CHUNK_SIZE || bz >= (cz + 1) * CHUNK_SIZE) continue;
         uint8_t groundType = getVoxel(bx, baseY, bz);
         if (groundType != 1 && groundType != 13 && groundType != 14) continue;
 
@@ -46,12 +140,12 @@ static void generateVoxelGrassBush(int cx, int baseY, int cz) {
         int curZ = bz;
         for (int h = 1; h <= height; h++) {
             int y = baseY + h;
-            if (y >= GRID_SIZE) break;
+            if (y >= WORLD_HEIGHT) break;
             
             if (h >= height - 2 && (rand() % 2 == 0)) {
                 curX += (cos(angle) > 0 ? 1 : -1);
                 curZ += (sin(angle) > 0 ? 1 : -1);
-                if (curX < 2 || curX >= GRID_SIZE - 2 || curZ < 2 || curZ >= GRID_SIZE - 2) break;
+                if (curX < cx * CHUNK_SIZE || curX >= (cx + 1) * CHUNK_SIZE || curZ < cz * CHUNK_SIZE || curZ >= (cz + 1) * CHUNK_SIZE) break;
             }
             setVoxelFast(curX, y, curZ, gType);
         }
@@ -59,7 +153,6 @@ static void generateVoxelGrassBush(int cx, int baseY, int cz) {
 }
 
 static void generateVoxelFlower(int x, int baseY, int z, int flowerIndex) {
-    if (x < 4 || x >= GRID_SIZE - 4 || z < 4 || z >= GRID_SIZE - 4) return;
     uint8_t groundType = getVoxel(x, baseY, z);
     if (groundType != 1 && groundType != 13 && groundType != 14) return;
 
@@ -186,42 +279,84 @@ static void generationWorker() {
             genCV.wait(lock, [] { return !genQueue.empty() || !genRunning; });
             if (!genRunning && genQueue.empty()) break;
             if (genQueue.empty()) continue;
-            task = genQueue.front();
-            genQueue.pop();
+            
+            int px = playerCurrentChunkX.load(std::memory_order_relaxed);
+            int pz = playerCurrentChunkZ.load(std::memory_order_relaxed);
+            
+            auto bestIt = genQueue.begin();
+            int bestDistSq = 999999999;
+            for (auto it = genQueue.begin(); it != genQueue.end(); ++it) {
+                int dx = it->x - px;
+                int dz = it->y - pz;
+                int distSq = dx * dx + dz * dz;
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestIt = it;
+                }
+            }
+            
+            task = *bestIt;
+            genQueue.erase(bestIt);
+            
+            int adx = std::abs(task.x - px);
+            int adz = std::abs(task.y - pz);
+            if (adx + adz > renderDistanceChunks + 1) {
+                generatingColumns.erase(task);
+                columnsRemaining--;
+                continue; // Skip generating this stale chunk
+            }
         }
 
         int cx = task.x;
         int cz = task.y;
 
-        ChunkData* localColumn[CHUNKS_PER_AXIS] = {nullptr};
-
-        for (int x = cx * CHUNK_SIZE; x < (cx + 1) * CHUNK_SIZE; x++) {
-            for (int z = cz * CHUNK_SIZE; z < (cz + 1) * CHUNK_SIZE; z++) {
-                auto localSetVoxel = [&](int lx, int ly, int lz, uint8_t type) {
-                    if (ly < 0 || ly >= GRID_SIZE) return;
-                    int cy = ly / CHUNK_SIZE;
-                    if (!localColumn[cy]) localColumn[cy] = new ChunkData();
-                    localColumn[cy]->blocks[lx % CHUNK_SIZE][ly % CHUNK_SIZE][lz % CHUNK_SIZE] = type;
-                };
-
-                int height = 30;
-
-                localSetVoxel(x, 0, z, 3); // Bedrock
-                for (int y = 1; y < height - 2; y++) {
-                    localSetVoxel(x, y, z, 15); // Stone (using 15 for stone)
+        ChunkData* localColumn[WORLD_HEIGHT_CHUNKS] = {nullptr};
+        bool loadedFromDisk = false;
+        
+        std::string filename = "world_data/col_" + std::to_string(cx) + "_" + std::to_string(cz) + ".bin";
+        std::ifstream inFile(filename, std::ios::binary);
+        if (inFile.is_open()) {
+            for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+                uint8_t hasChunk = 0;
+                inFile.read((char*)&hasChunk, sizeof(hasChunk));
+                if (hasChunk) {
+                    localColumn[cy] = new ChunkData();
+                    inFile.read((char*)localColumn[cy], sizeof(ChunkData));
                 }
-                localSetVoxel(x, height - 2, z, 2); // Dirt
-                localSetVoxel(x, height - 1, z, 2); // Dirt
-                localSetVoxel(x, height, z, 1); // Grass
+            }
+            inFile.close();
+            loadedFromDisk = true;
+        }
+
+        if (!loadedFromDisk) {
+            for (int x = cx * CHUNK_SIZE; x < (cx + 1) * CHUNK_SIZE; x++) {
+                for (int z = cz * CHUNK_SIZE; z < (cz + 1) * CHUNK_SIZE; z++) {
+                    auto localSetVoxel = [&](int lx, int ly, int lz, uint8_t type) {
+                        if (ly < 0 || ly >= WORLD_HEIGHT) return;
+                        int cy = ly / CHUNK_SIZE;
+                        if (!localColumn[cy]) localColumn[cy] = new ChunkData();
+                        localColumn[cy]->blocks[getLocalIdx(lx)][ly % CHUNK_SIZE][getLocalIdx(lz)] = type;
+                    };
+
+                    int height = 30; // Will be perlin noise later
+
+                    localSetVoxel(x, 0, z, 3); // Bedrock
+                    for (int y = 1; y < height - 2; y++) {
+                        localSetVoxel(x, y, z, 15); // Stone
+                    }
+                    localSetVoxel(x, height - 2, z, 2); // Dirt
+                    localSetVoxel(x, height - 1, z, 2); // Dirt
+                    localSetVoxel(x, height, z, 1); // Grass
+                }
             }
         }
 
-        bool generated[CHUNKS_PER_AXIS] = {false};
+        bool generated[WORLD_HEIGHT_CHUNKS] = {false};
         
         // Insert into global chunkManager safely
         {
             std::unique_lock<std::shared_mutex> lock(chunkMutex);
-            for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
+            for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
                 if (localColumn[cy]) {
                     generated[cy] = true;
                     glm::ivec3 key(cx, cy, cz);
@@ -230,7 +365,6 @@ static void generationWorker() {
                         chunkManager[key] = localColumn[cy];
                         worldGenerationId++;
                     } else {
-                        // Merge blocks into existing chunk (created by lighting thread)
                         for (int bx = 0; bx < CHUNK_SIZE; bx++) {
                             for (int by = 0; by < CHUNK_SIZE; by++) {
                                 for (int bz = 0; bz < CHUNK_SIZE; bz++) {
@@ -248,85 +382,24 @@ static void generationWorker() {
             }
         }
 
-        // Mark chunks dirty so mesher can pick them up immediately
-        for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
+        for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
             if (generated[cy]) {
-                // Call on minimum corner to trigger -1 neighbor updates
                 markChunkDirty(cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE);
-                // Call on maximum corner to trigger +1 neighbor updates
                 markChunkDirty(cx * CHUNK_SIZE + CHUNK_SIZE - 1, cy * CHUNK_SIZE + CHUNK_SIZE - 1, cz * CHUNK_SIZE + CHUNK_SIZE - 1);
             }
         }
 
         columnsRemaining--;
-    }
-}
-
-static void decoratorWorker() {
-    // Wait until base terrain is fully generated
-    while (columnsRemaining > 0 && genRunning) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    
-    if (!genRunning) return;
-
-    srand(globalSeed);
-    
-    auto getSurfaceY = [](int x, int z) -> int {
-        for (int y = GRID_SIZE - 1; y >= 0; y--) {
-            uint8_t t = getVoxel(x, y, z);
-            if (t != 0 && t != 8 && t != 5 && t != 27 && t != 28) {
-                if (t == 1 || t == 13 || t == 14 || t == 2 || t == 17 || t == 18 || t == 19) {
-                    return y;
-                }
-                return -1;
-            }
-        }
-        return -1;
-    };
-
-    int seaLevel = 36;
-    for (int t = 0; t < 10; t++) {
-        int tx = 50 + rand() % (GRID_SIZE - 100);
-        int tz = 50 + rand() % (GRID_SIZE - 100);
-        int ty = getSurfaceY(tx, tz);
-        if (ty > seaLevel + 4 && ty < 80) generateOrganicTree(tx, ty, tz);
-    }
-
-    for (int b = 0; b < 200; b++) {
-        int bx = 20 + rand() % (GRID_SIZE - 40);
-        int bz = 20 + rand() % (GRID_SIZE - 40);
-        int by = getSurfaceY(bx, bz);
-        if (by > seaLevel + 3) generateVoxelGrassBush(bx, by, bz);
-    }
-
-    for (int f = 0; f < 300; f++) {
-        int fx = 20 + rand() % (GRID_SIZE - 40);
-        int fz = 20 + rand() % (GRID_SIZE - 40);
-        int fy = getSurfaceY(fx, fz);
-        if (fy > seaLevel + 3) generateVoxelFlower(fx, fy, fz, f % 7);
-    }
-
-    // Remesh dirty chunks around decorators
-    for (int cx = 0; cx < CHUNKS_PER_AXIS; cx++) {
-        for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
-            for (int cz = 0; cz < CHUNKS_PER_AXIS; cz++) {
-                ChunkMesh& cm = chunkMeshes[cx][cy][cz];
-                if (cm.isDirty && !cm.isDirtyListed) {
-                    std::lock_guard<std::mutex> lock(dirtyChunksMutex);
-                    if (!cm.isDirtyListed) {
-                        cm.isDirtyListed = true;
-                        dirtyChunks.push_back(&cm);
-                    }
-                }
-            }
+        {
+            std::lock_guard<std::mutex> lock(genMutex);
+            generatingColumns.erase(task);
         }
     }
 }
 
 void initGenerationThreads() {
     genRunning = true;
-    unsigned int numThreads = std::max(1u, std::thread::hardware_concurrency() - 2);
+    unsigned int numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
     for (unsigned int i = 0; i < numThreads; i++) {
         genThreads.emplace_back(generationWorker);
     }
@@ -342,9 +415,6 @@ void stopGenerationThreads() {
         if (t.joinable()) t.join();
     }
     genThreads.clear();
-    if (decoratorThread.joinable()) {
-        decoratorThread.join();
-    }
 }
 
 void generateTerrain(unsigned int seed) {
@@ -352,27 +422,13 @@ void generateTerrain(unsigned int seed) {
     globalSeed = seed;
     std::cout << "Generating terrain..." << std::endl;
 
-    // Pre-initialize all chunk meshes so they have valid bounds and indices
-    for (int cx = 0; cx < CHUNKS_PER_AXIS; cx++) {
-        for (int cy = 0; cy < CHUNKS_PER_AXIS; cy++) {
-            for (int cz = 0; cz < CHUNKS_PER_AXIS; cz++) {
-                ChunkMesh& cm = chunkMeshes[cx][cy][cz];
-                cm.cx = cx; cm.cy = cy; cm.cz = cz;
-                cm.minAABB = glm::vec3(cx * CHUNK_SIZE * voxelSize, cy * CHUNK_SIZE * voxelSize, cz * CHUNK_SIZE * voxelSize);
-                cm.maxAABB = glm::vec3((cx + 1) * CHUNK_SIZE * voxelSize, (cy + 1) * CHUNK_SIZE * voxelSize, (cz + 1) * CHUNK_SIZE * voxelSize);
-            }
-        }
-    }
-
     worldGenerationId++;
     {
         std::lock_guard<std::mutex> lock(genMutex);
         std::vector<glm::ivec2> spawnOrder;
-        int center = CHUNKS_PER_AXIS / 2;
-        int radius = 6; // 12x12 chunk grid around center (144 columns)
         
-        for (int x = center - radius; x <= center + radius; x++) {
-            for (int z = center - radius; z <= center + radius; z++) {
+        for (int x = -5; x <= 5; x++) {
+            for (int z = -5; z <= 5; z++) {
                 spawnOrder.push_back({x, z});
             }
         }
@@ -380,12 +436,9 @@ void generateTerrain(unsigned int seed) {
         columnsRemaining = spawnOrder.size();
 
         for (const auto& task : spawnOrder) {
-            genQueue.push(task);
+            generatingColumns.insert(task);
+            genQueue.push_back(task);
         }
     }
     genCV.notify_all();
-    
-    // Launch background decorator thread to add trees/flowers when done
-    // if (decoratorThread.joinable()) decoratorThread.join();
-    // decoratorThread = std::thread(decoratorWorker);
 }

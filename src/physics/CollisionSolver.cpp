@@ -32,7 +32,7 @@ bool checkChunkCollision(const VoxelChunk& c, const glm::vec3& testCenter, const
             continue;
         }
 
-        if (gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE && gz >= 0 && gz < GRID_SIZE) {
+        if (gy >= 0 && gy < WORLD_HEIGHT) {
             if (getVoxel(gx, gy, gz) > 0) {
                 glm::vec3 normal(0.0f);
                 int emptyCount = 0;
@@ -42,7 +42,7 @@ bool checkChunkCollision(const VoxelChunk& c, const glm::vec3& testCenter, const
                     int nx = gx + nb[n][0];
                     int ny = gy + nb[n][1];
                     int nz = gz + nb[n][2];
-                    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE || getVoxel(nx, ny, nz) == 0) {
+                    if (ny < 0 || ny >= WORLD_HEIGHT || getVoxel(nx, ny, nz) == 0) {
                         normal += glm::vec3(nb[n][0], nb[n][1], nb[n][2]);
                         emptyCount++;
                     }

@@ -316,7 +316,7 @@ void triggerExplosion(glm::vec3 pos) {
             for (int dy = -sz; dy <= sz; dy++) {
                 for (int dz = -sz; dz <= sz; dz++) {
                     int gx = bp.x + dx, gy = bp.y + dy, gz = bp.z + dz;
-                    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE || gz < 0 || gz >= GRID_SIZE) continue;
+                    if (gy < 0 || gy >= WORLD_HEIGHT) continue;
                     if (getVoxel(gx, gy, gz) == 3 && gy <= 8) continue; // bedrock protection
                     if (getVoxel(gx, gy, gz) > 0) {
                         uint8_t vType = getVoxel(gx, gy, gz);
@@ -331,7 +331,7 @@ void triggerExplosion(glm::vec3 pos) {
                         const int nb[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
                         for (int n = 0; n < 6; n++) {
                             int nx = gx + nb[n][0], ny = gy + nb[n][1], nz = gz + nb[n][2];
-                            if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                            if (ny >= 0 && ny < WORLD_HEIGHT) {
                                 if (getVoxel(nx, ny, nz) > 0) {
                                     adjacentNodes.push_back((long long)nx << 40 | (long long)ny << 20 | (long long)nz);
                                 }
@@ -348,7 +348,7 @@ void triggerExplosion(glm::vec3 pos) {
         for (int y = -impactRadius; y <= impactRadius; y++) {
             for (int z = -impactRadius; z <= impactRadius; z++) {
                 int gx = ex + x, gy = ey + y, gz = ez + z;
-                if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE || gz < 0 || gz >= GRID_SIZE) continue;
+                if (gy < 0 || gy >= WORLD_HEIGHT) continue;
                 if (getVoxel(gx, gy, gz) == 0) continue;
                 if (getVoxel(gx, gy, gz) == 3 && gy <= 8) continue; // Bedrock protection
 
@@ -362,14 +362,14 @@ void triggerExplosion(glm::vec3 pos) {
 
                 if (destroy) {
                     int cx = gx / CHUNK_SIZE, cy = gy / CHUNK_SIZE, cz = gz / CHUNK_SIZE;
-                    if (chunkMeshes[cx][cy][cz].isMeshing) {
+                    if (getChunkMesh(cx, cy, cz)->isMeshing) {
                         continue; // Skip destroying if mesher thread is reading it
                     }
                     // Record adjacent stability nodes before deleting
                     const int nb[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
                     for (int i = 0; i < 6; i++) {
                         int nx = gx + nb[i][0], ny = gy + nb[i][1], nz = gz + nb[i][2];
-                        if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                        if (ny >= 0 && ny < WORLD_HEIGHT) {
                             if (getVoxel(nx, ny, nz) > 0) {
                                 adjacentNodes.push_back((long long)nx << 40 | (long long)ny << 20 | (long long)nz);
                             }

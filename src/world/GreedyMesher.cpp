@@ -50,7 +50,6 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
     const float floatAO[4] = { 0.35f, 0.56f, 0.78f, 1.00f };
 
     auto getVoxelGroundY = [&](int vx, int vy, int vz) -> int {
-        if (vx < 0 || vx >= GRID_SIZE || vz < 0 || vz >= GRID_SIZE) return vy;
         int gy = vy;
         while (gy > 0) {
             uint8_t t = getVoxel(vx, gy - 1, vz);

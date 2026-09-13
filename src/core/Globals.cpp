@@ -50,8 +50,8 @@ float swingRotY = 0.0f;
 glm::vec3 hammerHeadWorldPos = glm::vec3(0.0f);
 glm::vec3 hammerHeadWorldPrevPos = glm::vec3(0.0f);
 
-glm::vec3 hammerBasePos   = glm::vec3(0.6f, -0.65f, 0.75f);
-glm::vec2 hammerBaseRot   = glm::vec2(-25.0f, 10.0f);
+glm::vec3 hammerBasePos   = glm::vec3(0.749f, 0.199f, 1.072f);
+glm::vec2 hammerBaseRot   = glm::vec2(28.659f, 12.011f);
 
 bool  firstMouse = true;
 float yaw        = -90.0f;
@@ -78,6 +78,9 @@ bool enableWireframe = false;
 float chunkLifeMultiplier = 1.0f;
 int renderDistanceChunks = 1;
 glm::ivec2 spawnChunkPos(16, 16);
+std::atomic<int> playerCurrentChunkX(16);
+std::atomic<int> playerCurrentChunkZ(16);
+
 glm::vec3 waterShallowColor = glm::vec3(0.15f, 0.70f, 0.85f);
 glm::vec3 waterDeepColor = glm::vec3(0.02f, 0.20f, 0.60f);
 float waterSkyBlend = 0.5f;
