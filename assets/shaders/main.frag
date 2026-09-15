@@ -64,19 +64,21 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     // check whether current frag pos is in shadow
     float bias = max(0.02 * (1.0 - dot(normal, lightDir)), 0.005);
 
-    // Fast Soft Shadows (4 samples for performance)
-    vec2 poissonDisk[4] = vec2[]( 
+    // Smooth Soft Shadows (8 samples)
+    vec2 poissonDisk[8] = vec2[]( 
        vec2( -0.94201624, -0.39906216 ), vec2( 0.94558609, -0.76890725 ), 
-       vec2( -0.094184101, -0.92938870 ), vec2( 0.34495938, 0.29387760 )
+       vec2( -0.094184101, -0.92938870 ), vec2( 0.34495938, 0.29387760 ), 
+       vec2( -0.91588581, 0.45771432 ), vec2( -0.81544232, -0.87912464 ), 
+       vec2( -0.38277543, 0.27676845 ), vec2( 0.97484398, 0.75648379 )
     );
     
     float shadow = 0.0;
-    float filterRadius = 4.0 / 2048.0; 
-    for(int i = 0; i < 4; i++) {
+    float filterRadius = 8.0 / 2048.0; // Larger radius for softer shadows
+    for(int i = 0; i < 8; i++) {
         float pcfDepth = texture(shadowMap, projCoords.xy + poissonDisk[i] * filterRadius).r; 
         shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
     }
-    shadow /= 4.0;
+    shadow /= 8.0;
     
     // Keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
     if(projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0)
@@ -158,13 +160,9 @@ void main() {
         // More natural noise-based wave derivatives
         float t = iTime * uWaterWaveSpeed;
         
-        // Base low-frequency wave
-        float dx = noise2d(qPos * 0.5 + vec2(t * 0.5, t * 0.2)) * 1.5;
-        float dy = noise2d(qPos * 0.5 + vec2(-t * 0.3, t * 0.4)) * 1.5;
-        
-        // High-frequency detail
-        dx += noise2d(qPos * 1.5 - vec2(t * 1.2, 0.0)) * 0.7;
-        dy += noise2d(qPos * 1.5 + vec2(0.0, t * 1.1)) * 0.7;
+        // Base low-frequency wave (using simple sine instead of heavy noise)
+        float dx = sin(qPos.x * 2.0 + t) + sin((qPos.x + qPos.y) * 4.0 - t * 1.5) * 0.5;
+        float dy = cos(qPos.y * 2.0 + t * 0.8) + cos((qPos.x - qPos.y) * 5.0 + t * 1.2) * 0.5;
         
         // Quantize the slopes to create "voxel shaped" flat reflective steps
         float qdx = floor(dx * 3.0) / 3.0;

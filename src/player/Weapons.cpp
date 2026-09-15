@@ -184,7 +184,7 @@ void VoxelPlacerWeapon::Update(float dt, bool leftClick, bool leftMouseWasPresse
         markChunkDirty(ghostVox.x, ghostVox.y, ghostVox.z - 1);
         markChunkDirty(ghostVox.x, ghostVox.y, ghostVox.z + 1);
         
-        rebuildChunkSync(ghostVox.x / CHUNK_SIZE, ghostVox.y / CHUNK_SIZE, ghostVox.z / CHUNK_SIZE);
+        rebuildChunkSync(getChunkCoord(ghostVox.x), getChunkCoord(ghostVox.y), getChunkCoord(ghostVox.z));
         
         // Add a small recoil/shake effect for placement
         cameraShakeVel.y = std::min(cameraShakeVel.y + 0.05f, 0.15f);

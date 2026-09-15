@@ -9,9 +9,9 @@
 void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>& wv, int x0, int x1, int y0, int y1, int z0, int z1) {
     {
         std::shared_lock<std::shared_mutex> lock(chunkMutex);
-        int cx = x0 / CHUNK_SIZE;
-        int cy = y0 / CHUNK_SIZE;
-        int cz = z0 / CHUNK_SIZE;
+        int cx = getChunkCoord(x0);
+        int cy = getChunkCoord(y0);
+        int cz = getChunkCoord(z0);
         if (chunkManager.find(glm::ivec3(cx, cy, cz)) == chunkManager.end()) {
             return; // Chunk is completely air, no need to mesh
         }

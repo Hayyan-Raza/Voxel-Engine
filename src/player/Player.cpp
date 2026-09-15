@@ -5,6 +5,7 @@
 #include "../physics/Physics.h"
 #include "../physics/IslandDetection.h"
 #include "../physics/Ragdoll.h"
+#include "../physics/Raycast.h"
 #include "../physics/Mob.h"
 #include "../particles/Particles.h"
 #include "../core/Audio.h"
@@ -108,11 +109,11 @@ void updatePhysics() {
 
     // --- Gravity & Grounding (skip in inspector/spectator mode) ---
     if (!inspectorMode && !spectatorMode) {
-        int px = static_cast<int>(round(cameraPos.x / voxelSize));
-        int py = static_cast<int>(round(cameraPos.y / voxelSize));
-        int pz = static_cast<int>(round(cameraPos.z / voxelSize));
-        int py_feet = static_cast<int>(round((cameraPos.y - playerHeight) / voxelSize));
-        int py_legs = static_cast<int>(round((cameraPos.y - playerHeight * 0.5f) / voxelSize));
+        int px = static_cast<int>(floor(cameraPos.x / voxelSize));
+        int py = static_cast<int>(floor(cameraPos.y / voxelSize));
+        int pz = static_cast<int>(floor(cameraPos.z / voxelSize));
+        int py_feet = static_cast<int>(floor((cameraPos.y - playerHeight) / voxelSize));
+        int py_legs = static_cast<int>(floor((cameraPos.y - playerHeight * 0.5f) / voxelSize));
         bool inWater = false;
         {
             if ((py_feet >= 0 && py_feet < WORLD_HEIGHT && getVoxel(px, py_feet, pz) == 8) ||
@@ -138,7 +139,7 @@ void updatePhysics() {
             }
             
             // Apply water drag to horizontal movement
-            playerVelocityH *= 0.90f; 
+            playerVelocityH *= 0.96f; 
         } else {
             // Normal gravity
             playerVelocityY -= (GRAVITY * scaleFactor) * deltaTime;
@@ -148,8 +149,8 @@ void updatePhysics() {
 
         float physHitY = -1.0f;
         float voxelHitY = -1.0f;
-        int gx = static_cast<int>(round(cameraPos.x / voxelSize));
-        int gz = static_cast<int>(round(cameraPos.z / voxelSize));
+        int gx = static_cast<int>(floor(cameraPos.x / voxelSize));
+        int gz = static_cast<int>(floor(cameraPos.z / voxelSize));
         int currentGroundType = 0;
         {
             int startY = std::min(WORLD_HEIGHT - 1, static_cast<int>(floor((cameraPos.y - 0.02f) / voxelSize)));
@@ -207,35 +208,19 @@ void updatePhysics() {
     }
 
     hammerHitThisFrame = false;
+    hammerHitVox = glm::ivec3(0, -1, 0);
 
-    if (hammerRigidBody) {
-        btTransform trans;
-        trans.setIdentity();
-        trans.setOrigin(btVector3(hammerHeadWorldPos.x, hammerHeadWorldPos.y, hammerHeadWorldPos.z));
-        hammerRigidBody->getMotionState()->setWorldTransform(trans);
-        hammerRigidBody->setWorldTransform(trans);
-
-        if (destructionPending && (swingTimer > 0.0f && swingTimer < 0.16f)) {
-            btVector3 startPos(hammerHeadWorldPrevPos.x, hammerHeadWorldPrevPos.y, hammerHeadWorldPrevPos.z);
-            btVector3 endPos(hammerHeadWorldPos.x, hammerHeadWorldPos.y, hammerHeadWorldPos.z);
-            
-            btVector3 sweepDir = endPos - startPos;
-            if (sweepDir.length2() < 0.001f) {
-                sweepDir = btVector3(cameraFront.x, cameraFront.y, cameraFront.z);
-                startPos -= sweepDir * 0.5f;
-            }
-
-            btCollisionWorld::ClosestConvexResultCallback sweepCallback(startPos, endPos);
-            btTransform startTrans; startTrans.setIdentity(); startTrans.setOrigin(startPos);
-            btTransform endTrans; endTrans.setIdentity(); endTrans.setOrigin(endPos);
-
-            btBoxShape* shape = static_cast<btBoxShape*>(hammerShape);
-            dynamicsWorld->convexSweepTest(shape, startTrans, endTrans, sweepCallback);
-
-            if (sweepCallback.hasHit() && sweepCallback.m_hitCollisionObject != playerRigidBody) {
-                hammerHitThisFrame = true;
-                hammerHitWorldPos = glm::vec3(sweepCallback.m_hitPointWorld.x(), sweepCallback.m_hitPointWorld.y(), sweepCallback.m_hitPointWorld.z());
-                hammerHitWorldNormal = glm::vec3(sweepCallback.m_hitNormalWorld.x(), sweepCallback.m_hitNormalWorld.y(), sweepCallback.m_hitNormalWorld.z());
+    // We no longer rely on hammerRigidBody since Bullet physics is disabled for it.
+    if (destructionPending && (swingTimer > 0.0f && swingTimer < 0.16f)) {
+        // The physical sweep delta is too small and often misses or hits the player's own shapes.
+        // Using a standard camera forward raycast is much more reliable and aligns with where the player aims.
+        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 4.0f, 150.0f, 1.0f);
+        if (res.hit) {
+            hammerHitThisFrame = true;
+            hammerHitWorldPos = res.hitPos;
+            hammerHitWorldNormal = -cameraFront;
+            if (res.hitTerrain) {
+                hammerHitVox = res.hitVox;
             }
         }
     }

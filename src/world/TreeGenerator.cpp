@@ -41,7 +41,7 @@ static void drawThickLine(glm::vec3 start, glm::vec3 end, float thicknessStart, 
                             if ((fx * 37 + fy * 19 + fz * 17) % 4 == 0) {
                                 barkType = 20; 
                             }
-                            setVoxel(fx, fy, fz, barkType);
+                            setVoxelFast(fx, fy, fz, barkType);
                         }
                     }
                 }
@@ -50,42 +50,24 @@ static void drawThickLine(glm::vec3 start, glm::vec3 end, float thicknessStart, 
     }
 }
 
-// TEARDOWN STYLE LEAVES: scattered, airy, single-voxel clumps
 static void placeTeardownLeaves(int cx, int cy, int cz, float radius, bool isCherry) {
-    // Density scaling. User requested to decrease leaves a little. Factor reduced from 1.5f to 1.2f.
-    int numLeaves = (int)(radius * radius * radius * 1.2f); 
-    
-    for (int i = 0; i < numLeaves; i++) {
-        // Random point inside the sphere using spherical coordinates
-        float u = (rand() % 1000) / 1000.0f;
-        float v = (rand() % 1000) / 1000.0f;
-        float theta = u * 2.0f * glm::pi<float>();
-        float phi = acos(2.0f * v - 1.0f);
-        float r = std::cbrt((rand() % 1000) / 1000.0f) * radius;
-
-        int fx = cx + (int)(r * sin(phi) * cos(theta));
-        int fy = cy + (int)(r * cos(phi));
-        int fz = cz + (int)(r * sin(phi) * sin(theta));
-
-        // Place a SINGLE leaf voxel (maximum airiness)
-        if (fy >= 0 && fy < WORLD_HEIGHT) {
-            if (getVoxel(fx, fy, fz) == 0) { 
-                if (isCherry) {
-                    setVoxel(fx, fy, fz, (rand() % 3 == 0) ? 28 : 27);
-                } else {
-                    setVoxel(fx, fy, fz, (rand() % 3 == 0) ? 24 : 23);
-                }
-            }
-        }
-        
-        // Randomly attach ONE extra leaf next to it 30% of the time
-        if (rand() % 100 < 30) {
-            int nx = fx + (rand() % 3 - 1);
-            int ny = fy + (rand() % 3 - 1);
-            int nz = fz + (rand() % 3 - 1);
-            if (ny >= 0 && ny < WORLD_HEIGHT) {
-                if (getVoxel(nx, ny, nz) == 0) {
-                    setVoxel(nx, ny, nz, isCherry ? 28 : 23);
+    int rInt = (int)std::ceil(radius);
+    uint8_t clumpColor = isCherry ? (rand() % 3 == 0 ? 28 : 27) : (rand() % 3 == 0 ? 24 : 23);
+    for (int dx = -rInt; dx <= rInt; dx++) {
+        for (int dy = -rInt; dy <= rInt; dy++) {
+            for (int dz = -rInt; dz <= rInt; dz++) {
+                float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                // Add some noise to the edges for a clumpy, less perfectly spherical look
+                float noise = ((rand() % 100) - 50) / 100.0f; // -0.5 to 0.5
+                if (dist + noise * 1.5f <= radius) {
+                    int fx = cx + dx;
+                    int fy = cy + dy;
+                    int fz = cz + dz;
+                    if (fy >= 0 && fy < WORLD_HEIGHT) {
+                        if (getVoxel(fx, fy, fz) == 0) { 
+                            setVoxelFast(fx, fy, fz, clumpColor);
+                        }
+                    }
                 }
             }
         }

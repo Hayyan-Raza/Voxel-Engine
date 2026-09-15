@@ -98,8 +98,8 @@ void RenderPipeline::initBuffers(int width, int height) {
     glGenTextures(1, &depthMap);
     glBindTexture(GL_TEXTURE_2D, depthMap);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -241,13 +241,13 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     glm::mat4 model = glm::mat4(1.0f);
     glUniformMatrix4fv(shadowLocs.model, 1, GL_FALSE, glm::value_ptr(model));
 
-    int pcx = cameraPos.x / (CHUNK_SIZE * voxelSize);
-    int pcz = cameraPos.z / (CHUNK_SIZE * voxelSize);
+    int pcx = (int)std::floor(cameraPos.x / (CHUNK_SIZE * voxelSize));
+    int pcz = (int)std::floor(cameraPos.z / (CHUNK_SIZE * voxelSize));
 
     for (ChunkMesh* cmPtr : activeStaticMeshes) {
         ChunkMesh& cm = *cmPtr;
         bool isSpawn = (cm.cx == spawnChunkPos.x && cm.cz == spawnChunkPos.y);
-        int dist = std::abs(cm.cx - pcx) + std::abs(cm.cz - pcz);
+        int dist = std::max(std::abs(cm.cx - pcx), std::abs(cm.cz - pcz));
         if (!isSpawn && dist > renderDistanceChunks) continue;
 
         glm::vec3 chunkCenter = cm.minAABB + glm::vec3((CHUNK_SIZE * voxelSize) / 2.0f);
@@ -332,7 +332,7 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     for (ChunkMesh* cmPtr : activeStaticMeshes) {
         ChunkMesh& cm = *cmPtr;
         bool isSpawn = (cm.cx == spawnChunkPos.x && cm.cz == spawnChunkPos.y);
-        int dist = std::abs(cm.cx - pcx) + std::abs(cm.cz - pcz);
+        int dist = std::max(std::abs(cm.cx - pcx), std::abs(cm.cz - pcz));
         if (!isSpawn && dist > renderDistanceChunks) continue;
 
         if (viewFrustum.isBoxVisible(cm.minAABB, cm.maxAABB)) {
@@ -487,7 +487,7 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     }
 
     pp.end();
-    pp.render(fbW_int, fbH_int, (float)glfwGetTime(), vBloom, vChromAb, vGrain, vExposure, view, proj);
+    pp.render(fbW_int, fbH_int, (float)glfwGetTime(), vBloom, vChromAb, vGrain, vExposure, view, proj, sun);
 
     // Call UI Manager
     uiManager.renderUI(window, deltaTime, cameraPos, cameraFront, view, proj);

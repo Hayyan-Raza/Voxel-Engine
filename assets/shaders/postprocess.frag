@@ -13,6 +13,9 @@ uniform float uBloom;
 uniform float uChromAb;
 uniform float uGrain;
 uniform float uExposure;
+uniform bool uEnableVolumetric;
+uniform float uVolumetricIntensity;
+uniform vec2 uSunScreenPos;
 
 uniform mat4 uView;
 uniform mat4 uProj;
@@ -59,6 +62,35 @@ void main() {
     bloom = max(bloom - 0.7, 0.0) * uBloom; 
     
     scene += bloom;
+
+    // Volumetric Lighting (God Rays)
+    if (uEnableVolumetric) {
+        vec2 deltaTextCoord = vec2(uv - uSunScreenPos);
+        vec2 textCoo = uv;
+        deltaTextCoord *= 1.0 / 24.0; // 24 samples instead of 64 for performance
+        float illuminationDecay = 1.0;
+        
+        vec3 godRays = vec3(0.0);
+        for(int i=0; i < 24; i++) {
+            textCoo -= deltaTextCoord;
+            
+            // Only sky (depth == 1.0) emits strong god rays
+            float depth = texture(depthTexture, textCoo).r;
+            vec3 samp = texture(screenTexture, textCoo).rgb;
+            if (depth >= 0.999) {
+                samp *= 2.5; // boost sky intensity for rays
+            } else {
+                samp *= 0.1; // heavily occlude non-sky objects
+            }
+            
+            samp *= illuminationDecay;
+            godRays += samp;
+            illuminationDecay *= 0.96; // decay parameter
+        }
+        
+        godRays *= (1.0 / 24.0) * uVolumetricIntensity;
+        scene += godRays;
+    }
 
     // Exposure & Tonemapping
     scene *= uExposure;

@@ -20,6 +20,7 @@ public:
     GLuint blurShader;
     GLuint compositeShader;
     GLint uTime, uRes, uBloom, uChromAb, uGrain, uExposure;
+    GLint uEnableVolumetric, uVolumetricIntensity, uSunScreenPos;
     GLint uView, uProj, uInvView, uInvProj;
     int width, height;
 
@@ -29,7 +30,7 @@ public:
     void init(int width, int height);
     void resize(int width, int height);
     void begin();
-    void render(int width, int height, float time, float bloom, float chromAb, float grain, float exposure, const glm::mat4& view, const glm::mat4& proj);
+    void render(int width, int height, float time, float bloom, float chromAb, float grain, float exposure, const glm::mat4& view, const glm::mat4& proj, const glm::vec3& sunDir);
     void end();
 
 private:

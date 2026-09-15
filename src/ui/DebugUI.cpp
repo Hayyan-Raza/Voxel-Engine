@@ -34,6 +34,10 @@ void drawConfigMenu(GLFWwindow* window) {
     ImGui::Text("Environment");
     ImGui::SliderInt("Render Distance (Chunks)", &renderDistanceChunks, 0, 16);
     ImGui::Checkbox("Enable Sun/Moon", &enableSunMoon);
+    ImGui::Checkbox("Volumetric God Rays", &enableVolumetricLighting);
+    if (enableVolumetricLighting) {
+        ImGui::SliderFloat("God Ray Intensity", &volumetricIntensity, 0.0f, 1.0f);
+    }
     
     ImGui::Checkbox("Enable Directional Light", &enableDirLight);
     ImGui::Checkbox("Enable Wireframe Mode", &enableWireframe);

@@ -157,15 +157,6 @@ void handleDestruction(GLFWwindow* window) {
             if (Weapon* w = GetWeapon(currentWeapon)) {
                 w->Update(deltaTime, leftNow, leftMouseWasPressed);
             }
-            if (hammerHitThisFrame) {
-                glm::ivec3 hitVox(
-                    static_cast<int>(floor((hammerHitWorldPos.x - hammerHitWorldNormal.x * 0.05f) / voxelSize)),
-                    static_cast<int>(floor((hammerHitWorldPos.y - hammerHitWorldNormal.y * 0.05f) / voxelSize)),
-                    static_cast<int>(floor((hammerHitWorldPos.z - hammerHitWorldNormal.z * 0.05f) / voxelSize))
-                );
-                applyTerrainDestruction(hitVox, hammerHitWorldPos, 1, -hammerHitWorldNormal);
-                hammerHitThisFrame = false;
-            }
         } else if (currentWeapon >= 2000) {
             // Weapon 2000+: Spawn structure
             if (!leftMouseWasPressed && showGhostVox && !gamePaused) {
@@ -218,6 +209,14 @@ void handleDestruction(GLFWwindow* window) {
             ghostVox = placeVox;
             showGhostVox = true;
         }
+    }
+
+    if (hammerHitThisFrame) {
+        if (hammerHitVox.y >= 0 && hammerHitVox.y < WORLD_HEIGHT) {
+            applyTerrainDestruction(hammerHitVox, hammerHitWorldPos, 3, -hammerHitWorldNormal);
+        }
+        hammerHitThisFrame = false;
+        destructionPending = false;
     }
 
     if (shootTimer > 0.0f) {

@@ -100,6 +100,7 @@ void setVoxelFast(int x, int y, int z, uint8_t type) {
     } else {
         it->second->blocks[getLocalIdx(x)][getLocalIdx(y)][getLocalIdx(z)] = type;
     }
+    markChunkDirty(x, y, z);
 }
 
 uint8_t getLight(int x, int y, int z) {

@@ -95,6 +95,8 @@ float vChromAb = 0.02f;
 float vGrain = 0.02f;
 float vExposure = 1.0f;
 float particleLifespan = 2.0f;
+bool enableVolumetricLighting = true;
+float volumetricIntensity = 0.5f;
 
 bool gamePaused          = false;
 bool configMode          = false;
@@ -103,6 +105,8 @@ bool escapeKeyWasPressed = false;
 bool cKeyWasPressed      = false;
 bool leftMouseWasPressed = false;
 bool rightMouseWasPressed = false;
+bool hammerHitThisFrame = false;
+glm::ivec3 hammerHitVox(0,0,0);
 bool destructionPending  = false;
 bool f5KeyWasPressed     = false;
 float fbW = 800.0f, fbH = 600.0f;

@@ -65,7 +65,7 @@ void processLighting() {
             LightRemovalNode node = remQ.front();
             remQ.pop();
 
-            chunksToUpdate.insert(glm::ivec3(node.x / CHUNK_SIZE, node.y / CHUNK_SIZE, node.z / CHUNK_SIZE));
+            chunksToUpdate.insert(glm::ivec3(getChunkCoord(node.x), getChunkCoord(node.y), getChunkCoord(node.z)));
 
             for (int i = 0; i < 6; i++) {
                 int nx = node.x + dirs[i][0];
@@ -87,7 +87,7 @@ void processLighting() {
             LightNode node = addQ.front();
             addQ.pop();
 
-            chunksToUpdate.insert(glm::ivec3(node.x / CHUNK_SIZE, node.y / CHUNK_SIZE, node.z / CHUNK_SIZE));
+            chunksToUpdate.insert(glm::ivec3(getChunkCoord(node.x), getChunkCoord(node.y), getChunkCoord(node.z)));
 
             uint8_t light = getLight(node.x, node.y, node.z);
             for (int i = 0; i < 6; i++) {

@@ -239,7 +239,7 @@ void processInput(GLFWwindow* window) {
             currentSchematic = (currentSchematic + 1) % 5;
         } else {
             float scaleFactor = voxelSize / 0.01f;
-            spawnRagdoll(cameraPos + cameraFront * (1.2f * scaleFactor), cameraFront * (3.5f * scaleFactor) + glm::vec3(0.0f, 0.8f, 0.0f));
+            spawnLivingMushroom(cameraPos + cameraFront * (3.5f * scaleFactor) + glm::vec3(0.0f, 2.5f, 0.0f));
         }
     }
     rKeyWasPressed = rNow;
@@ -248,7 +248,7 @@ void processInput(GLFWwindow* window) {
     bool fNow = (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS);
     if (fNow && !fKeyWasPressed && !gamePaused && !configMode) {
         float scaleFactor = voxelSize / 0.01f;
-        spawnLivingChick(cameraPos + cameraFront * (1.2f * scaleFactor));
+        spawnLivingMushroom(cameraPos + cameraFront * (3.5f * scaleFactor) + glm::vec3(0.0f, 2.5f, 0.0f));
     }
     fKeyWasPressed = fNow;
 

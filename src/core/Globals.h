@@ -99,6 +99,8 @@ extern float vChromAb;
 extern float vGrain;
 extern float vExposure;
 extern float particleLifespan;
+extern bool enableVolumetricLighting;
+extern float volumetricIntensity;
 
 // ---- Inventory ----
 extern int currentWeapon; // -1 for none, 0-4 for weapons, 5 for voxel placer
@@ -116,6 +118,8 @@ extern bool escapeKeyWasPressed;
 extern bool cKeyWasPressed;
 extern bool leftMouseWasPressed;
 extern bool rightMouseWasPressed;
+extern bool hammerHitThisFrame;
+extern glm::ivec3 hammerHitVox;
 extern bool destructionPending; // True if hammer is mid-swing and impact hasn't happened yet
 extern bool f5KeyWasPressed;
 

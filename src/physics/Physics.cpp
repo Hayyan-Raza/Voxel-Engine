@@ -26,7 +26,6 @@ btCollisionShape*                    playerShape            = nullptr;
 btRigidBody*                         hammerRigidBody        = nullptr;
 btCollisionShape*                    hammerShape            = nullptr;
 
-bool  hammerHitThisFrame = false;
 glm::vec3 hammerHitWorldPos = glm::vec3(0.0f);
 glm::vec3 hammerHitWorldNormal = glm::vec3(0.0f);
 
@@ -213,7 +212,7 @@ void updateChunkPhysics() {
                 }
                 
                 // Allow dynamic sliding/tumbling along collision surfaces
-                c.center += c.velocity * deltaTime + colNormal * (voxelSize * 0.04f);
+                c.center += c.velocity * deltaTime + colNormal * (voxelSize * 0.4f);
                 float resolvedAngle = glm::length(c.angularVelocity) * deltaTime;
                 if (resolvedAngle > 0.001f) {
                     glm::vec3 axis = glm::normalize(c.angularVelocity);
@@ -361,7 +360,7 @@ void triggerExplosion(glm::vec3 pos) {
                 }
 
                 if (destroy) {
-                    int cx = gx / CHUNK_SIZE, cy = gy / CHUNK_SIZE, cz = gz / CHUNK_SIZE;
+                    int cx = getChunkCoord(gx), cy = getChunkCoord(gy), cz = getChunkCoord(gz);
                     if (getChunkMesh(cx, cy, cz)->isMeshing) {
                         continue; // Skip destroying if mesher thread is reading it
                     }

@@ -17,7 +17,13 @@ enum RagdollVoxelType : uint8_t {
     RAGDOLL_EYES = 7,        // Facial features
     RAGDOLL_CHICK_FEATHERS = 8, // Chick yellow feathers
     RAGDOLL_CHICK_BEAK = 9,  // Chick orange beak
-    RAGDOLL_CHICK_LEGS = 10  // Chick orange legs
+    RAGDOLL_CHICK_LEGS = 10, // Chick orange legs
+    RAGDOLL_MUSH_RED = 11,
+    RAGDOLL_MUSH_WHITE = 12,
+    RAGDOLL_MUSH_BEIGE = 13,
+    RAGDOLL_MUSH_BROWN = 14,
+    RAGDOLL_MUSH_BLUE = 15,
+    RAGDOLL_MUSH_GREEN = 16
 };
 
 struct RagdollVoxel {

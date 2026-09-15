@@ -107,7 +107,7 @@ void extractTerrainToChunk(const glm::ivec3& hitVox, const glm::vec3& pullDir) {
         }
         setVoxel(hitVox.x, hitVox.y, hitVox.z, 0);
         markChunkDirty(hitVox.x, hitVox.y, hitVox.z);
-        rebuildChunkSync(hitVox.x / CHUNK_SIZE, hitVox.y / CHUNK_SIZE, hitVox.z / CHUNK_SIZE);
+        rebuildChunkSync(getChunkCoord(hitVox.x), getChunkCoord(hitVox.y), getChunkCoord(hitVox.z));
     }
 
     if (!debrisChunk.voxels.empty()) {

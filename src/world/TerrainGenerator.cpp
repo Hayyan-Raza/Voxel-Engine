@@ -72,25 +72,29 @@ void saveWorker() {
         }
 
         std::string filename = "world_data/col_" + std::to_string(task.cx) + "_" + std::to_string(task.cz) + ".bin";
-        std::ofstream outFile(filename, std::ios::binary);
+        std::string tempFilename = filename + ".tmp";
+        std::ofstream outFile(tempFilename, std::ios::binary);
         if (outFile.is_open()) {
             for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
-                if (task.chunks[cy] != nullptr) {
-                    uint8_t hasChunk = 1;
-                    outFile.write((char*)&hasChunk, sizeof(hasChunk));
-                    outFile.write((char*)task.chunks[cy], sizeof(ChunkData));
-                } else {
-                    uint8_t hasChunk = 0;
-                    outFile.write((char*)&hasChunk, sizeof(hasChunk));
+                uint8_t hasChunk = (task.chunks[cy] != nullptr) ? 1 : 0;
+                outFile.write((char*)&hasChunk, 1);
+                if (hasChunk) {
+                    outFile.write((char*)task.chunks[cy]->blocks, sizeof(ChunkData::blocks));
+                    delete task.chunks[cy];
                 }
             }
             outFile.close();
-        }
-
-        // Cleanup memory now that it's saved
-        for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
-            if (task.chunks[cy] != nullptr) {
-                delete task.chunks[cy];
+            std::error_code ec;
+            std::filesystem::rename(tempFilename, filename, ec);
+            if (ec) {
+                // Fallback if rename fails
+                std::filesystem::remove(filename, ec);
+                std::filesystem::rename(tempFilename, filename, ec);
+            }
+        } else {
+            // If we couldn't open the file, we still need to delete the memory!
+            for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+                if (task.chunks[cy]) delete task.chunks[cy];
             }
         }
     }
@@ -300,7 +304,7 @@ static void generationWorker() {
             
             int adx = std::abs(task.x - px);
             int adz = std::abs(task.y - pz);
-            if (adx + adz > renderDistanceChunks + 1) {
+            if (std::max(adx, adz) > renderDistanceChunks + 1) {
                 generatingColumns.erase(task);
                 columnsRemaining--;
                 continue; // Skip generating this stale chunk
@@ -316,19 +320,33 @@ static void generationWorker() {
         std::string filename = "world_data/col_" + std::to_string(cx) + "_" + std::to_string(cz) + ".bin";
         std::ifstream inFile(filename, std::ios::binary);
         if (inFile.is_open()) {
+            bool readFailed = false;
             for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
                 uint8_t hasChunk = 0;
-                inFile.read((char*)&hasChunk, sizeof(hasChunk));
+                inFile.read((char*)&hasChunk, 1);
+                if (inFile.fail()) { readFailed = true; break; }
                 if (hasChunk) {
                     localColumn[cy] = new ChunkData();
-                    inFile.read((char*)localColumn[cy], sizeof(ChunkData));
+                    inFile.read((char*)localColumn[cy]->blocks, sizeof(ChunkData::blocks));
+                    if (inFile.fail()) { readFailed = true; break; }
                 }
             }
             inFile.close();
-            loadedFromDisk = true;
+            
+            if (readFailed) {
+                for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
+                    if (localColumn[cy]) { delete localColumn[cy]; localColumn[cy] = nullptr; }
+                }
+            } else {
+                loadedFromDisk = true;
+            }
         }
 
+        struct DecoratorSpot { int x, y, z; int type; };
+        std::vector<DecoratorSpot> decorators;
+        
         if (!loadedFromDisk) {
+            PerlinNoise noise(globalSeed);
             for (int x = cx * CHUNK_SIZE; x < (cx + 1) * CHUNK_SIZE; x++) {
                 for (int z = cz * CHUNK_SIZE; z < (cz + 1) * CHUNK_SIZE; z++) {
                     auto localSetVoxel = [&](int lx, int ly, int lz, uint8_t type) {
@@ -338,28 +356,81 @@ static void generationWorker() {
                         localColumn[cy]->blocks[getLocalIdx(lx)][ly % CHUNK_SIZE][getLocalIdx(lz)] = type;
                     };
 
-                    int height = 30; // Will be perlin noise later
+                    // FBM noise for terrain height
+                    double n = noise.fbm2D(x * 0.004, z * 0.004, 4, 0.5, 2.0); // Range roughly [-1, 1]
+                    double m = noise.fbm2D(x * 0.001, z * 0.001, 3, 0.5, 2.0); // Mountain noise
+                    
+                    // Base elevation
+                    int height = 28 + (int)(n * 12);
+                    
+                    // Add mountains
+                    if (m > 0.1) {
+                        height += (int)((m - 0.1) * 80);
+                    }
+
+                    if (height < 5) height = 5;
+                    if (height >= WORLD_HEIGHT - 5) height = WORLD_HEIGHT - 5;
 
                     localSetVoxel(x, 0, z, 3); // Bedrock
-                    for (int y = 1; y < height - 2; y++) {
-                        uint32_t hash = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
-                        uint8_t stoneType = 15; // Darker Stone shade
-                        int mod = hash % 100;
-                        if (mod < 15) stoneType = 3; // Stone
-                        else if (mod < 30) stoneType = 16; // Lighter Stone shade
+                    
+                    int waterLevel = 26;
+                    
+                    if (height < waterLevel) {
+                        // Underwater (Sand)
+                        for (int y = 1; y < height - 2; y++) {
+                            uint32_t hash = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+                            uint8_t stoneType = (hash % 100 < 20) ? 3 : 15;
+                            localSetVoxel(x, y, z, stoneType); 
+                        }
+                        localSetVoxel(x, height - 2, z, 18); // Sand
+                        localSetVoxel(x, height - 1, z, 18); // Sand
+                        localSetVoxel(x, height, z, 18); // Sand
                         
-                        localSetVoxel(x, y, z, stoneType); 
+                        // Fill water up to waterLevel
+                        for (int y = height + 1; y <= waterLevel; y++) {
+                            localSetVoxel(x, y, z, 8); // Water
+                        }
+                    } else if (height <= waterLevel + 1) {
+                        // Beach (Sand above water)
+                        for (int y = 1; y < height - 2; y++) {
+                            uint32_t hash = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+                            uint8_t stoneType = (hash % 100 < 20) ? 3 : 15;
+                            localSetVoxel(x, y, z, stoneType); 
+                        }
+                        localSetVoxel(x, height - 2, z, 18); // Sand
+                        localSetVoxel(x, height - 1, z, 18); // Sand
+                        localSetVoxel(x, height, z, 18); // Sand
+                    } else {
+                        // Normal Grass/Dirt
+                        for (int y = 1; y < height - 2; y++) {
+                            uint32_t hash = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+                            uint8_t stoneType = 15; // Darker Stone shade
+                            int mod = hash % 100;
+                            if (mod < 15) stoneType = 3; // Stone
+                            else if (mod < 30) stoneType = 16; // Lighter Stone shade
+                            
+                            localSetVoxel(x, y, z, stoneType); 
+                        }
+                        localSetVoxel(x, height - 2, z, 2); // Dirt
+                        localSetVoxel(x, height - 1, z, 2); // Dirt
+                        
+                        uint32_t grassHash = (x * 73856093) ^ (height * 19349663) ^ (z * 83492791);
+                        uint8_t grassType = 1; // Vibrant Green
+                        int gMod = grassHash % 100;
+                        if (gMod < 15) grassType = 13; // Dark Olive
+                        else if (gMod < 30) grassType = 14; // Bright Lime
+                        
+                        localSetVoxel(x, height, z, grassType);
+                        
+                        // Collect decorators deterministically
+                        if (grassHash % 20000 == 0) {
+                            decorators.push_back({x, height, z, 0}); // Tree
+                        } else if (grassHash % 50 == 0) {
+                            decorators.push_back({x, height, z, 1}); // Grass bush
+                        } else if (grassHash % 60 == 0) {
+                            decorators.push_back({x, height, z, 2 + (int)(grassHash % 7)}); // Flower
+                        }
                     }
-                    localSetVoxel(x, height - 2, z, 2); // Dirt
-                    localSetVoxel(x, height - 1, z, 2); // Dirt
-                    
-                    uint32_t grassHash = (x * 73856093) ^ (height * 19349663) ^ (z * 83492791);
-                    uint8_t grassType = 1; // Vibrant Green
-                    int gMod = grassHash % 100;
-                    if (gMod < 15) grassType = 13; // Dark Olive
-                    else if (gMod < 30) grassType = 14; // Bright Lime
-                    
-                    localSetVoxel(x, height, z, grassType);
                 }
             }
         }
@@ -399,6 +470,17 @@ static void generationWorker() {
             if (generated[cy]) {
                 markChunkDirty(cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE);
                 markChunkDirty(cx * CHUNK_SIZE + CHUNK_SIZE - 1, cy * CHUNK_SIZE + CHUNK_SIZE - 1, cz * CHUNK_SIZE + CHUNK_SIZE - 1);
+            }
+        }
+
+        // Apply decorators globally now that the base terrain is inserted
+        for (const auto& dec : decorators) {
+            if (dec.type == 0) {
+                generateOrganicTree(dec.x, dec.y, dec.z);
+            } else if (dec.type == 1) {
+                generateVoxelGrassBush(dec.x, dec.y, dec.z);
+            } else {
+                generateVoxelFlower(dec.x, dec.y, dec.z, dec.type - 2);
             }
         }
 

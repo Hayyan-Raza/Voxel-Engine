@@ -247,8 +247,8 @@ void rebuildChunkSync(int cx, int cy, int cz) {
 #include "TerrainGenerator.h"
 
 void updateActiveChunks(glm::vec3 cameraPos) {
-    int pcx = getChunkCoord(cameraPos.x / voxelSize);
-    int pcz = getChunkCoord(cameraPos.z / voxelSize);
+    int pcx = getChunkCoord((int)std::floor(cameraPos.x / voxelSize));
+    int pcz = getChunkCoord((int)std::floor(cameraPos.z / voxelSize));
     
     playerCurrentChunkX.store(pcx, std::memory_order_relaxed);
     playerCurrentChunkZ.store(pcz, std::memory_order_relaxed);
@@ -258,7 +258,7 @@ void updateActiveChunks(glm::vec3 cameraPos) {
 
     for (int dx = -renderDistanceChunks; dx <= renderDistanceChunks; dx++) {
         for (int dz = -renderDistanceChunks; dz <= renderDistanceChunks; dz++) {
-            if (std::abs(dx) + std::abs(dz) <= renderDistanceChunks) {
+            if (std::max(std::abs(dx), std::abs(dz)) <= renderDistanceChunks) {
                 desiredColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
             }
         }
@@ -272,9 +272,19 @@ void updateActiveChunks(glm::vec3 cameraPos) {
         }
     }
 
-    // Unload chunks not in desired
+    std::unordered_set<glm::ivec2, ivec2_hash> keepColumns = desiredColumns;
+    int unloadDistance = renderDistanceChunks + 2;
+    for (int dx = -unloadDistance; dx <= unloadDistance; dx++) {
+        for (int dz = -unloadDistance; dz <= unloadDistance; dz++) {
+            if (std::max(std::abs(dx), std::abs(dz)) <= unloadDistance) {
+                keepColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
+            }
+        }
+    }
+
+    // Unload chunks not in keep
     for (const auto& col : currentColumns) {
-        if (desiredColumns.find(col) == desiredColumns.end()) {
+        if (keepColumns.find(col) == keepColumns.end()) {
             SaveTask task;
             task.cx = col.x;
             task.cz = col.y;
@@ -282,15 +292,20 @@ void updateActiveChunks(glm::vec3 cameraPos) {
             // Remove from chunkManager and detach data
             {
                 std::unique_lock<std::shared_mutex> lock(chunkMutex);
+                bool erasedAny = false;
                 for (int cy = 0; cy < WORLD_HEIGHT_CHUNKS; cy++) {
                     glm::ivec3 key(col.x, cy, col.y);
                     auto it = chunkManager.find(key);
                     if (it != chunkManager.end()) {
                         task.chunks[cy] = it->second;
                         chunkManager.erase(it);
+                        erasedAny = true;
                     } else {
                         task.chunks[cy] = nullptr;
                     }
+                }
+                if (erasedAny) {
+                    worldGenerationId++;
                 }
             }
             

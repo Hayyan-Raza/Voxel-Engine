@@ -2,6 +2,7 @@
 #include "ShaderManager.h"
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
+#include "../core/Globals.h"
 
 PostProcess::PostProcess() : fbo(0), texture(0), normalTexture(0), depthTexture(0), rbo(0), quadVAO(0), quadVBO(0), shader(0), width(0), height(0) {}
 
@@ -77,7 +78,9 @@ void PostProcess::init(int width, int height) {
     for (unsigned int i = 0; i < 3; i++) {
         glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
         glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        int pw = (i > 0) ? width / 2 : width;
+        int ph = (i > 0) ? height / 2 : height;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, pw, ph, 0, GL_RGBA, GL_FLOAT, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -100,6 +103,9 @@ void PostProcess::init(int width, int height) {
     uChromAb = glGetUniformLocation(shader, "uChromAb");
     uGrain = glGetUniformLocation(shader, "uGrain");
     uExposure = glGetUniformLocation(shader, "uExposure");
+    uEnableVolumetric = glGetUniformLocation(shader, "uEnableVolumetric");
+    uVolumetricIntensity = glGetUniformLocation(shader, "uVolumetricIntensity");
+    uSunScreenPos = glGetUniformLocation(shader, "uSunScreenPos");
     
     uView = glGetUniformLocation(shader, "uView");
     uProj = glGetUniformLocation(shader, "uProj");
@@ -137,7 +143,9 @@ void PostProcess::resize(int width, int height) {
     
     for (unsigned int i = 0; i < 3; i++) {
         glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        int pw = (i > 0) ? width / 2 : width;
+        int ph = (i > 0) ? height / 2 : height;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, pw, ph, 0, GL_RGBA, GL_FLOAT, NULL);
     }
 }
 
@@ -150,7 +158,7 @@ void PostProcess::end() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void PostProcess::render(int width, int height, float time, float bloom, float chromAb, float grain, float exposure, const glm::mat4& view, const glm::mat4& proj) {
+void PostProcess::render(int width, int height, float time, float bloom, float chromAb, float grain, float exposure, const glm::mat4& view, const glm::mat4& proj, const glm::vec3& sunDir) {
     glViewport(0, 0, width, height);
     glDisable(GL_DEPTH_TEST);
     glUseProgram(shader);
@@ -163,6 +171,25 @@ void PostProcess::render(int width, int height, float time, float bloom, float c
     glUniform1f(uChromAb, chromAb);
     glUniform1f(uGrain, grain);
     glUniform1f(uExposure, exposure);
+    extern glm::vec3 cameraPos;
+    extern glm::vec3 cameraFront;
+    
+    float sunDot = glm::dot(cameraFront, sunDir);
+    float actualIntensity = volumetricIntensity;
+    if (sunDot < 0.0f) {
+        actualIntensity = 0.0f;
+    } else {
+        actualIntensity *= glm::smoothstep(0.0f, 0.2f, sunDot);
+    }
+    
+    glUniform1i(uEnableVolumetric, enableVolumetricLighting ? 1 : 0);
+    glUniform1f(uVolumetricIntensity, actualIntensity);
+    
+    // Sun position screen space projection
+    glm::vec4 sunClip = proj * view * glm::vec4(cameraPos + sunDir * 1000.0f, 1.0f);
+    glm::vec2 sunScreen = glm::vec2(sunClip.x, sunClip.y) / sunClip.w;
+    sunScreen = sunScreen * 0.5f + 0.5f;
+    glUniform2f(uSunScreenPos, sunScreen.x, sunScreen.y);
     
     glUniformMatrix4fv(uView, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uProj, 1, GL_FALSE, glm::value_ptr(proj));
@@ -179,43 +206,8 @@ void PostProcess::render(int width, int height, float time, float bloom, float c
     glBindTexture(GL_TEXTURE_2D, emissionTexture);
 
     glBindVertexArray(quadVAO);
-    // Draw postprocess into pingpong 0 (to extract bloom/composite base)
-    glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[0]);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    
-    // Blur Pass
-    bool horizontal = true, first_iteration = true;
-    int amount = 4;
-    glUseProgram(blurShader);
-    for (unsigned int i = 0; i < amount; i++) {
-        // Indices 1 and 2 for ping-pong
-        int bindIndex = horizontal ? 1 : 2;
-        glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[bindIndex]); 
-        glUniform1i(glGetUniformLocation(blurShader, "horizontal"), horizontal);
-        
-        glActiveTexture(GL_TEXTURE0);
-        // On first iteration, bind from scene (0), else from the other pingpong
-        int textureIndex = first_iteration ? 0 : (horizontal ? 2 : 1);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[textureIndex]); 
-        
-        glUniform1i(glGetUniformLocation(blurShader, "first_iteration"), first_iteration);
-        
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        horizontal = !horizontal;
-        if (first_iteration) first_iteration = false;
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Back to default framebuffer
-    
-    // Composite Pass
-    glUseProgram(compositeShader);
-    glUniform1f(glGetUniformLocation(compositeShader, "uBloomIntensity"), bloom);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[0]); // Scene
-    glActiveTexture(GL_TEXTURE1);
-    // The last render was in !horizontal pingpong buffer, which is (horizontal ? 2 : 1)
-    int finalBlurIndex = horizontal ? 2 : 1;
-    glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[finalBlurIndex]); // Blurred Bloom
+    // Draw postprocess directly to the default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
     glEnable(GL_DEPTH_TEST);
