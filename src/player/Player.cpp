@@ -225,6 +225,9 @@ void updatePhysics() {
         }
     }
 
+
+
+    
     // --- Player Pushes Active Loose Chunks ---
     float playerRadius = 0.08f; 
     float playerHeightHalf = 0.15f * 0.5f;

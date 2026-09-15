@@ -12,7 +12,7 @@
 static Weapon* g_weapons[6] = {nullptr};
 
 void InitWeapons() {
-    g_weapons[0] = new HammerWeapon();
+    g_weapons[0] = new HammerWeapon(); //hammer fixed
     g_weapons[1] = new AK47Weapon();
     g_weapons[2] = new DynamiteWeapon();
     g_weapons[3] = new GlockWeapon();
@@ -28,7 +28,7 @@ Weapon* GetWeapon(int id) {
 // ----- Hammer Weapon -----
 void HammerWeapon::Update(float dt, bool leftClick, bool leftMouseWasPressed) {
     if (leftClick && !leftMouseWasPressed && swingTimer <= 0.0f) {
-        swingTimer = 0.35f;
+        swingTimer = 0.36f;
         destructionPending = true;
     }
 }
