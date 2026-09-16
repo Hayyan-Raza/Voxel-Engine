@@ -34,7 +34,14 @@ void drawConfigMenu(GLFWwindow* window) {
     ImGui::Text("Environment");
     ImGui::SliderInt("Render Distance (Chunks)", &renderDistanceChunks, 0, 16);
     ImGui::Checkbox("Enable Sun/Moon", &enableSunMoon);
+    ImGui::Checkbox("Soft Shadows (PCF)", &enableSoftShadows);
     ImGui::Checkbox("Volumetric God Rays", &enableVolumetricLighting);
+    ImGui::Checkbox("Volumetric Clouds", &enableVolumetricClouds);
+    if (enableVolumetricClouds) {
+        ImGui::SliderFloat("Cloud Density", &cloudDensityMult, 0.05f, 2.0f); // Allow much thicker
+        ImGui::SliderFloat("Cloud Coverage", &cloudCoverage, 0.2f, 0.9f);
+        ImGui::SliderFloat("Cloud Speed", &cloudSpeedMult, 0.0f, 5.0f);
+    }
     if (enableVolumetricLighting) {
         ImGui::SliderFloat("God Ray Intensity", &volumetricIntensity, 0.0f, 1.0f);
     }

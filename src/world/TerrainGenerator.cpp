@@ -304,7 +304,7 @@ static void generationWorker() {
             
             int adx = std::abs(task.x - px);
             int adz = std::abs(task.y - pz);
-            if (std::max(adx, adz) > renderDistanceChunks + 1) {
+            if (std::max(adx, adz) > renderDistanceChunks + 3) {
                 generatingColumns.erase(task);
                 columnsRemaining--;
                 continue; // Skip generating this stale chunk

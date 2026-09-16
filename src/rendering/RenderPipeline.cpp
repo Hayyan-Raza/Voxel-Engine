@@ -84,6 +84,12 @@ void RenderPipeline::cacheUniformLocations() {
     skyLocs.uSkyColor = glGetUniformLocation(skyShader, "uSkyColor");
     skyLocs.uEnableSunMoon = glGetUniformLocation(skyShader, "uEnableSunMoon");
     skyLocs.uCameraPos = glGetUniformLocation(skyShader, "uCameraPos");
+    skyLocs.uTime = glGetUniformLocation(skyShader, "uTime");
+    skyLocs.uEnableClouds = glGetUniformLocation(skyShader, "uEnableClouds");
+    skyLocs.uCloudDensity = glGetUniformLocation(skyShader, "uCloudDensity");
+    skyLocs.uCloudCoverage = glGetUniformLocation(skyShader, "uCloudCoverage");
+    skyLocs.uRenderDist = glGetUniformLocation(skyShader, "uRenderDist");
+    skyLocs.uCloudSpeed = glGetUniformLocation(skyShader, "uCloudSpeed");
 
     // Particle shader
     particleLocs.view = glGetUniformLocation(particleShader, "view");
@@ -217,17 +223,24 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     float orthoSize = 60.0f;
     lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, near_plane, far_plane);
     
-    // Snap light target to texel size to prevent shadow swimming
-    float texelSize = (orthoSize * 2.0f) / 2048.0f;
     glm::vec3 lightTarget = cameraPos;
-    lightTarget.x = std::floor(lightTarget.x / texelSize) * texelSize;
-    lightTarget.z = std::floor(lightTarget.z / texelSize) * texelSize;
-    lightTarget.y = std::floor(lightTarget.y / texelSize) * texelSize; // Quantize Y too instead of forcing 0.0f
-    
-    // Place light high enough so tall mountains aren't clipped behind the light
+    lightTarget.y = 0.0f;
     glm::vec3 lightPos = lightTarget + lightDir * 180.0f; 
     
     lightView = glm::lookAt(lightPos, lightTarget, glm::vec3(0.0, 1.0, 0.0));
+    
+    // Fix shadow swimming by snapping to texel increments in light space
+    glm::mat4 shadowMatrix = lightProjection * lightView;
+    glm::vec4 shadowOrigin = shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    shadowOrigin = shadowOrigin * (2048.0f / 2.0f);
+    
+    glm::vec2 roundedOrigin = glm::round(glm::vec2(shadowOrigin.x, shadowOrigin.y));
+    glm::vec2 roundingOffset = roundedOrigin - glm::vec2(shadowOrigin.x, shadowOrigin.y);
+    roundingOffset = roundingOffset * (2.0f / 2048.0f);
+    
+    lightProjection[3][0] += roundingOffset.x;
+    lightProjection[3][1] += roundingOffset.y;
+    
     lightSpaceMatrix = lightProjection * lightView;
 
     // --- Shadow Pass ---
@@ -305,6 +318,7 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     glUniform3fv(mainLocs.viewPos, 1, glm::value_ptr(cameraPos));
     glUniform2f(mainLocs.screenRes, (float)fbW, (float)fbH);
     glUniform1f(mainLocs.uAOScale, vAOScale);
+    glUniform1i(glGetUniformLocation(mainShader, "uSoftShadows"), enableSoftShadows ? 1 : 0);
     glUniform1f(mainLocs.neighborAO, 1.0f);
     glUniform1f(mainLocs.iTime, (float)glfwGetTime());
 
@@ -333,7 +347,9 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
         ChunkMesh& cm = *cmPtr;
         bool isSpawn = (cm.cx == spawnChunkPos.x && cm.cz == spawnChunkPos.y);
         int dist = std::max(std::abs(cm.cx - pcx), std::abs(cm.cz - pcz));
-        if (!isSpawn && dist > renderDistanceChunks) continue;
+        if (!isSpawn && dist > renderDistanceChunks) {
+            continue;
+        }
 
         if (viewFrustum.isBoxVisible(cm.minAABB, cm.maxAABB)) {
             glBindVertexArray(cm.VAO);
@@ -383,6 +399,12 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     glUniform3f(skyLocs.uSunDir, sun.x, sun.y, sun.z);
     glUniform3f(skyLocs.uSkyColor, currentSky.r, currentSky.g, currentSky.b);
     glUniform1i(skyLocs.uEnableSunMoon, enableSunMoon ? 1 : 0);
+    glUniform1f(skyLocs.uTime, (float)glfwGetTime());
+    glUniform1i(skyLocs.uEnableClouds, enableVolumetricClouds ? 1 : 0);
+    glUniform1f(skyLocs.uCloudDensity, cloudDensityMult);
+    glUniform1f(skyLocs.uCloudCoverage, cloudCoverage);
+    glUniform1i(skyLocs.uRenderDist, renderDistanceChunks);
+    glUniform1f(skyLocs.uCloudSpeed, cloudSpeedMult);
     glUniform3fv(skyLocs.uCameraPos, 1, glm::value_ptr(cameraPos));
     
     glBindVertexArray(quadVAO);

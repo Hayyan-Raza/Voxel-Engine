@@ -100,7 +100,12 @@ extern float vGrain;
 extern float vExposure;
 extern float particleLifespan;
 extern bool enableVolumetricLighting;
+extern bool enableVolumetricClouds;
+extern float cloudDensityMult;
+extern float cloudCoverage;
+extern float cloudSpeedMult;
 extern float volumetricIntensity;
+extern bool enableSoftShadows;
 
 // ---- Inventory ----
 extern int currentWeapon; // -1 for none, 0-4 for weapons, 5 for voxel placer

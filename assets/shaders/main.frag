@@ -30,6 +30,7 @@ uniform vec3 uWaterShallowColor;
 uniform vec3 uWaterDeepColor;
 uniform float uWaterSkyBlend;
 uniform float uWaterWaveSpeed;
+uniform bool uSoftShadows;
 
 // Simple 2D noise for natural wave patterns
 float hash2d(vec2 p) {
@@ -73,12 +74,17 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     );
     
     float shadow = 0.0;
-    float filterRadius = 8.0 / 2048.0; // Larger radius for softer shadows
-    for(int i = 0; i < 8; i++) {
-        float pcfDepth = texture(shadowMap, projCoords.xy + poissonDisk[i] * filterRadius).r; 
-        shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+    if (uSoftShadows) {
+        float filterRadius = 8.0 / 2048.0; // Larger radius for softer shadows
+        for(int i = 0; i < 8; i++) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + poissonDisk[i] * filterRadius).r; 
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+        }
+        shadow /= 8.0;
+    } else {
+        float pcfDepth = texture(shadowMap, projCoords.xy).r;
+        shadow = currentDepth - bias > pcfDepth ? 1.0 : 0.0;
     }
-    shadow /= 8.0;
     
     // Keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
     if(projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0)

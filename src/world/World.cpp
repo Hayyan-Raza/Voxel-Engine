@@ -245,6 +245,7 @@ void rebuildChunkSync(int cx, int cy, int cz) {
 }
 
 #include "TerrainGenerator.h"
+#include "../core/Globals.h"
 
 void updateActiveChunks(glm::vec3 cameraPos) {
     int pcx = getChunkCoord((int)std::floor(cameraPos.x / voxelSize));

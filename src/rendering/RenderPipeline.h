@@ -53,6 +53,8 @@ private:
     struct {
         GLint invProj, invView, uSunDir, uSkyColor;
         GLint uEnableSunMoon, uCameraPos;
+        GLint uTime, uEnableClouds;
+        GLint uCloudDensity, uCloudCoverage, uRenderDist, uCloudSpeed;
     } skyLocs;
 
     struct {

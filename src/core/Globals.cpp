@@ -63,7 +63,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 float g_fogDensity = 0.05f;
-float dayNightSpeed = 0.01f; // Slowed down from 0.5f to prevent rapidly moving shadow patterns
+float dayNightSpeed = 0.0f; // Stopped default sun movement to prevent moving shadow artifacts
 Frustum viewFrustum;
 float timeScale = 0.05f;
 
@@ -76,7 +76,7 @@ bool enableSunMoon = true;
 bool enableDirLight = false;
 bool enableWireframe = false;
 float chunkLifeMultiplier = 1.0f;
-int renderDistanceChunks = 1;
+int renderDistanceChunks = 9;
 glm::ivec2 spawnChunkPos(16, 16);
 std::atomic<int> playerCurrentChunkX(16);
 std::atomic<int> playerCurrentChunkZ(16);
@@ -96,7 +96,12 @@ float vGrain = 0.02f;
 float vExposure = 1.0f;
 float particleLifespan = 2.0f;
 bool enableVolumetricLighting = true;
-float volumetricIntensity = 0.5f;
+bool enableVolumetricClouds = true;
+float cloudDensityMult = 0.8f; // Bumped default to be thicker
+float cloudCoverage = 0.65f;
+float cloudSpeedMult = 1.0f;
+float volumetricIntensity = 1.0f;
+bool enableSoftShadows = true;
 
 bool gamePaused          = false;
 bool configMode          = false;

@@ -61,17 +61,33 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
         return 0;
     };
 
-    auto pushQuad = [&](uint8_t type, uint8_t aoKey, uint16_t lightKey, uint8_t gY, float r, float g, float b, const glm::vec3& n, const glm::vec3 corners[6]) {
+    auto pushQuad = [&](uint8_t type, uint8_t aoKey, uint16_t lightKey, uint8_t gY, float r, float g, float b, const glm::vec3& n, const glm::vec3 corners[4]) {
         float f0 = floatAO[(aoKey >> 6) & 3];
         float f1 = floatAO[(aoKey >> 4) & 3];
         float f2 = floatAO[(aoKey >> 2) & 3];
         float f3 = floatAO[aoKey & 3];
-        float ao[6] = { f0, f1, f2, f0, f2, f3 };
+        
+        bool flip = (f0 + f2) < (f1 + f3);
+        
+        float ao[6];
+        uint8_t vLight[6];
+        glm::vec3 c[6];
+        
         uint8_t l0 = (lightKey >> 12) & 0xF;
         uint8_t l1 = (lightKey >> 8) & 0xF;
         uint8_t l2 = (lightKey >> 4) & 0xF;
         uint8_t l3 = lightKey & 0xF;
-        uint8_t vLight[6] = { l0, l1, l2, l0, l2, l3 };
+        
+        if (flip) {
+            ao[0] = f1; ao[1] = f2; ao[2] = f3; ao[3] = f1; ao[4] = f3; ao[5] = f0;
+            vLight[0] = l1; vLight[1] = l2; vLight[2] = l3; vLight[3] = l1; vLight[4] = l3; vLight[5] = l0;
+            c[0] = corners[1]; c[1] = corners[2]; c[2] = corners[3]; c[3] = corners[1]; c[4] = corners[3]; c[5] = corners[0];
+        } else {
+            ao[0] = f0; ao[1] = f1; ao[2] = f2; ao[3] = f0; ao[4] = f2; ao[5] = f3;
+            vLight[0] = l0; vLight[1] = l1; vLight[2] = l2; vLight[3] = l0; vLight[4] = l2; vLight[5] = l3;
+            c[0] = corners[0]; c[1] = corners[1]; c[2] = corners[2]; c[3] = corners[0]; c[4] = corners[2]; c[5] = corners[3];
+        }
+
         bool isVeg = (type == 5 || type == 9 || type == 10 || type == 11 || type == 12 || type == 21 || type == 22 || type == 26);
         for (int i = 0; i < 6; i++) {
             float finalAO = ao[i];
@@ -87,7 +103,8 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
             int8_t cnz = (int8_t)(n.z * 127.0f);
             uint8_t isEm = (type == 31) ? 255 : 0;
             uint8_t lightLevel = vLight[i];
-            if (type == 8) wv.push_back({corners[i].x, corners[i].y, corners[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO}); else v.push_back({corners[i].x, corners[i].y, corners[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO});
+            if (type == 8) wv.push_back({c[i].x, c[i].y, c[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO}); 
+            else v.push_back({c[i].x, c[i].y, c[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO});
         }
     };
 
@@ -155,11 +172,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         float pz = z * voxelSize;
 
                         glm::vec3 n(1, 0, 0);
-                        glm::vec3 corners[6] = {
+                        glm::vec3 corners[4] = {
                             {px + voxelSize, py, pz + w * voxelSize},
                             {px + voxelSize, py, pz},
-                            {px + voxelSize, py + h * voxelSize, pz},
-                            {px + voxelSize, py, pz + w * voxelSize},
                             {px + voxelSize, py + h * voxelSize, pz},
                             {px + voxelSize, py + h * voxelSize, pz + w * voxelSize}
                         };
@@ -240,11 +255,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         float py_h = (y + h) * voxelSize;
 
                         glm::vec3 n(-1, 0, 0);
-                        glm::vec3 corners[6] = {
+                        glm::vec3 corners[4] = {
                             {px, py, pz},
                             {px, py, pz_w},
-                            {px, py_h, pz_w},
-                            {px, py, pz},
                             {px, py_h, pz_w},
                             {px, py_h, pz}
                         };
@@ -328,11 +341,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         float pz_w = (z + w) * voxelSize;
 
                         glm::vec3 n(0, 1, 0);
-                        glm::vec3 corners[6] = {
+                        glm::vec3 corners[4] = {
                             {px, py, pz_w},
                             {px_h, py, pz_w},
-                            {px_h, py, pz},
-                            {px, py, pz_w},
                             {px_h, py, pz},
                             {px, py, pz}
                         };
@@ -416,11 +427,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         float pz_w = (z + w) * voxelSize;
 
                         glm::vec3 n(0, -1, 0);
-                        glm::vec3 corners[6] = {
+                        glm::vec3 corners[4] = {
                             {px, py, pz},
                             {px_h, py, pz},
-                            {px_h, py, pz_w},
-                            {px, py, pz},
                             {px_h, py, pz_w},
                             {px, py, pz_w}
                         };
@@ -453,15 +462,15 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
                         if (shouldDraw) {
-                            uint8_t s0 = getAOScore(isSolid(x+1, y, z+1), isSolid(x, y-1, z+1), isSolid(x+1, y-1, z+1));
-                            uint8_t s1 = getAOScore(isSolid(x-1, y, z+1), isSolid(x, y-1, z+1), isSolid(x-1, y-1, z+1));
-                            uint8_t s2 = getAOScore(isSolid(x-1, y, z+1), isSolid(x, y+1, z+1), isSolid(x-1, y+1, z+1));
-                            uint8_t s3 = getAOScore(isSolid(x+1, y, z+1), isSolid(x, y+1, z+1), isSolid(x+1, y+1, z+1));
+                            uint8_t s0 = getAOScore(isSolid(x-1, y, z+1), isSolid(x, y-1, z+1), isSolid(x-1, y-1, z+1));
+                            uint8_t s1 = getAOScore(isSolid(x+1, y, z+1), isSolid(x, y-1, z+1), isSolid(x+1, y-1, z+1));
+                            uint8_t s2 = getAOScore(isSolid(x+1, y, z+1), isSolid(x, y+1, z+1), isSolid(x+1, y+1, z+1));
+                            uint8_t s3 = getAOScore(isSolid(x-1, y, z+1), isSolid(x, y+1, z+1), isSolid(x-1, y+1, z+1));
 
-                            uint8_t l0 = getVertexLight(x, y, z+1, 1, 0, 0, 0, -1, 0, 1, -1, 0);
-                            uint8_t l1 = getVertexLight(x, y, z+1, -1, 0, 0, 0, -1, 0, -1, -1, 0);
-                            uint8_t l2 = getVertexLight(x, y, z+1, -1, 0, 0, 0, 1, 0, -1, 1, 0);
-                            uint8_t l3 = getVertexLight(x, y, z+1, 1, 0, 0, 0, 1, 0, 1, 1, 0);
+                            uint8_t l0 = getVertexLight(x, y, z+1, -1, 0, 0, 0, -1, 0, -1, -1, 0);
+                            uint8_t l1 = getVertexLight(x, y, z+1, 1, 0, 0, 0, -1, 0, 1, -1, 0);
+                            uint8_t l2 = getVertexLight(x, y, z+1, 1, 0, 0, 0, 1, 0, 1, 1, 0);
+                            uint8_t l3 = getVertexLight(x, y, z+1, -1, 0, 0, 0, 1, 0, -1, 1, 0);
 
                             uint64_t lightKey = (l0 << 12) | (l1 << 8) | (l2 << 4) | l3;
                             uint8_t aoKey = (s0 << 6) | (s1 << 4) | (s2 << 2) | s3;
@@ -504,11 +513,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         float py_w = (y + w) * voxelSize;
 
                         glm::vec3 n(0, 0, 1);
-                        glm::vec3 corners[6] = {
+                        glm::vec3 corners[4] = {
                             {px, py, pz},
                             {px_h, py, pz},
-                            {px_h, py_w, pz},
-                            {px, py, pz},
                             {px_h, py_w, pz},
                             {px, py_w, pz}
                         };
@@ -541,15 +548,15 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
                         if (shouldDraw) {
-                            uint8_t s0 = getAOScore(isSolid(x-1, y, z-1), isSolid(x, y-1, z-1), isSolid(x-1, y-1, z-1));
-                            uint8_t s1 = getAOScore(isSolid(x+1, y, z-1), isSolid(x, y-1, z-1), isSolid(x+1, y-1, z-1));
-                            uint8_t s2 = getAOScore(isSolid(x+1, y, z-1), isSolid(x, y+1, z-1), isSolid(x+1, y+1, z-1));
-                            uint8_t s3 = getAOScore(isSolid(x-1, y, z-1), isSolid(x, y+1, z-1), isSolid(x-1, y+1, z-1));
+                            uint8_t s0 = getAOScore(isSolid(x+1, y, z-1), isSolid(x, y-1, z-1), isSolid(x+1, y-1, z-1));
+                            uint8_t s1 = getAOScore(isSolid(x-1, y, z-1), isSolid(x, y-1, z-1), isSolid(x-1, y-1, z-1));
+                            uint8_t s2 = getAOScore(isSolid(x-1, y, z-1), isSolid(x, y+1, z-1), isSolid(x-1, y+1, z-1));
+                            uint8_t s3 = getAOScore(isSolid(x+1, y, z-1), isSolid(x, y+1, z-1), isSolid(x+1, y+1, z-1));
 
-                            uint8_t l0 = getVertexLight(x, y, z-1, -1, 0, 0, 0, -1, 0, -1, -1, 0);
-                            uint8_t l1 = getVertexLight(x, y, z-1, 1, 0, 0, 0, -1, 0, 1, -1, 0);
-                            uint8_t l2 = getVertexLight(x, y, z-1, 1, 0, 0, 0, 1, 0, 1, 1, 0);
-                            uint8_t l3 = getVertexLight(x, y, z-1, -1, 0, 0, 0, 1, 0, -1, 1, 0);
+                            uint8_t l0 = getVertexLight(x, y, z-1, 1, 0, 0, 0, -1, 0, 1, -1, 0);
+                            uint8_t l1 = getVertexLight(x, y, z-1, -1, 0, 0, 0, -1, 0, -1, -1, 0);
+                            uint8_t l2 = getVertexLight(x, y, z-1, -1, 0, 0, 0, 1, 0, -1, 1, 0);
+                            uint8_t l3 = getVertexLight(x, y, z-1, 1, 0, 0, 0, 1, 0, 1, 1, 0);
 
                             uint64_t lightKey = (l0 << 12) | (l1 << 8) | (l2 << 4) | l3;
                             uint8_t aoKey = (s0 << 6) | (s1 << 4) | (s2 << 2) | s3;
@@ -592,11 +599,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         float py_w = (y + w) * voxelSize;
 
                         glm::vec3 n(0, 0, -1);
-                        glm::vec3 corners[6] = {
+                        glm::vec3 corners[4] = {
                             {px_h, py, pz},
                             {px, py, pz},
-                            {px, py_w, pz},
-                            {px_h, py, pz},
                             {px, py_w, pz},
                             {px_h, py_w, pz}
                         };
