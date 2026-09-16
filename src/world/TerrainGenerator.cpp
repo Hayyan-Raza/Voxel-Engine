@@ -494,7 +494,7 @@ static void generationWorker() {
 
 void initGenerationThreads() {
     genRunning = true;
-    unsigned int numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
+    unsigned int numThreads = std::max(2u, std::thread::hardware_concurrency() / 2);
     for (unsigned int i = 0; i < numThreads; i++) {
         genThreads.emplace_back(generationWorker);
     }

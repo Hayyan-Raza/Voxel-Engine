@@ -120,7 +120,7 @@ static void mesherWorker() {
 
 void initMesherThread() {
     mesherRunning = true;
-    unsigned int numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
+    unsigned int numThreads = std::max(2u, std::thread::hardware_concurrency() / 2);
     for (unsigned int i = 0; i < numThreads; i++) {
         mesherThreads.emplace_back(mesherWorker);
     }
@@ -400,7 +400,7 @@ void updateStaticMesh(glm::vec3 cameraPos) {
         std::vector<ChunkMesh*> stillDirty;
         std::vector<MeshTask> batchQueue;
         
-        const int MAX_DISPATCHES = isInitialLoading ? 4096 : 64;
+        const int MAX_DISPATCHES = isInitialLoading ? 4096 : 128;
         int dispatched = 0;
 
         // Iterate backwards so closest chunks (at front) are pushed last to batchQueue
@@ -440,7 +440,7 @@ void updateStaticMesh(glm::vec3 cameraPos) {
     {
         std::lock_guard<std::mutex> lock(resultMutex);
         int uploadsThisFrame = 0;
-        const int MAX_UPLOADS = isInitialLoading ? 512 : 8; // Prevent massive frame stalls
+        const int MAX_UPLOADS = isInitialLoading ? 512 : 24; 
         while (!resultQueue.empty() && uploadsThisFrame < MAX_UPLOADS) {
             completedMeshes.push_back(std::move(resultQueue.front()));
             resultQueue.pop();
