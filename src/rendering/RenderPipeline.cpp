@@ -72,6 +72,13 @@ void RenderPipeline::cacheUniformLocations() {
     mainLocs.uDiffuseColor = glGetUniformLocation(mainShader, "uDiffuseColor");
     mainLocs.uPointLightPos = glGetUniformLocation(mainShader, "uPointLightPos");
     mainLocs.uPointLightColor = glGetUniformLocation(mainShader, "uPointLightColor");
+    
+    // SSR Uniforms
+    mainLocs.opaqueColor = glGetUniformLocation(mainShader, "opaqueColor");
+    mainLocs.opaqueDepth = glGetUniformLocation(mainShader, "opaqueDepth");
+    mainLocs.invView = glGetUniformLocation(mainShader, "invView");
+    mainLocs.invProj = glGetUniformLocation(mainShader, "invProj");
+    mainLocs.uEnableWaterReflections = glGetUniformLocation(mainShader, "uEnableWaterReflections");
 
     // Shadow shader
     shadowLocs.lightSpaceMatrix = glGetUniformLocation(shadowShader, "lightSpaceMatrix");
@@ -116,6 +123,26 @@ void RenderPipeline::initBuffers(int width, int height) {
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    // --- SSR Textures Setup ---
+    glGenTextures(1, &opaqueColorTex);
+    glBindTexture(GL_TEXTURE_2D, opaqueColorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenTextures(1, &opaqueDepthTex);
+    glBindTexture(GL_TEXTURE_2D, opaqueDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
+    currentOpaqueW = width;
+    currentOpaqueH = height;
+
     initCubeGeometry(cubeVAO, cubeVBO);
 
     // --- Particle Billboard VBO ---
@@ -159,6 +186,16 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     static int lastRenderW = 800, lastRenderH = 600;
     if (renderW > 0 && renderH > 0 && (renderW != lastRenderW || renderH != lastRenderH)) {
         pp.resize(renderW, renderH);
+        
+        glBindTexture(GL_TEXTURE_2D, opaqueColorTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, renderW, renderH, 0, GL_RGBA, GL_FLOAT, NULL);
+        
+        glBindTexture(GL_TEXTURE_2D, opaqueDepthTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, renderW, renderH, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        
+        currentOpaqueW = renderW;
+        currentOpaqueH = renderH;
+        
         lastRenderW = renderW;
         lastRenderH = renderH;
     }
@@ -362,11 +399,25 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     drawMobs(mainLocs.model, mainLocs.voxelColor, mainLocs.shadowObscurance);
     drawGhostBlock(mainLocs.model, mainLocs.voxelColor, cubeVAO);
     
+    // --- Opaque Scene Copy for SSR ---
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, opaqueColorTex);
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, currentOpaqueW, currentOpaqueH);
+
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, opaqueDepthTex);
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, currentOpaqueW, currentOpaqueH);
+
+    glUniform1i(mainLocs.opaqueColor, 4);
+    glUniform1i(mainLocs.opaqueDepth, 5);
+    glUniform1i(mainLocs.uEnableWaterReflections, enableWaterReflections ? 1 : 0);
+    glUniformMatrix4fv(mainLocs.invView, 1, GL_FALSE, glm::value_ptr(glm::inverse(view)));
+    glUniformMatrix4fv(mainLocs.invProj, 1, GL_FALSE, glm::value_ptr(glm::inverse(proj)));
+
     // --- Transparent Water ---
-    // DISABLED FOR NOW
-    /*
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
     glUniform4f(mainLocs.voxelColor, 1.0f, 1.0f, 1.0f, 0.7f);
     glUniformMatrix4fv(mainLocs.model, 1, GL_FALSE, glm::value_ptr(I));
     for (ChunkMesh* cmPtr : activeWaterMeshes) {
@@ -387,7 +438,7 @@ void RenderPipeline::renderFrame(GLFWwindow* window, float deltaTime, UIManager&
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glDisable(GL_BLEND);
-    */
+    glDepthMask(GL_TRUE); // Restore depth mask after water
 
     // Draw Sky
     glDepthFunc(GL_LEQUAL);

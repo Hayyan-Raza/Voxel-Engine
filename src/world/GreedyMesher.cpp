@@ -88,6 +88,19 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
             c[0] = corners[0]; c[1] = corners[1]; c[2] = corners[2]; c[3] = corners[0]; c[4] = corners[2]; c[5] = corners[3];
         }
 
+        if (isWater(type) && n.y > -0.5f) {
+            float yOffset = 0.1f + getWaterLevel(type) * 0.11f;
+            float maxY = -1000.0f;
+            for (int v = 0; v < 6; v++) {
+                maxY = std::max(maxY, c[v].y);
+            }
+            for (int v = 0; v < 6; v++) {
+                if (c[v].y >= maxY - 0.1f) {
+                    c[v].y -= yOffset;
+                }
+            }
+        }
+
         bool isVeg = (type == 5 || type == 9 || type == 10 || type == 11 || type == 12 || type == 21 || type == 22 || type == 26);
         for (int i = 0; i < 6; i++) {
             float finalAO = ao[i];
@@ -103,7 +116,7 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
             int8_t cnz = (int8_t)(n.z * 127.0f);
             uint8_t isEm = (type == 31) ? 255 : 0;
             uint8_t lightLevel = vLight[i];
-            if (type == 8) wv.push_back({c[i].x, c[i].y, c[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO}); 
+            if (isWater(type)) wv.push_back({c[i].x, c[i].y, c[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO});
             else v.push_back({c[i].x, c[i].y, c[i].z, cr, cg, cb, cnx, cny, cnz, isEm, lightLevel, finalAO});
         }
     };
@@ -119,7 +132,17 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                     if (type > 0) {
                         uint8_t nType = getVoxel(x + 1, y, z);
                         bool shouldDraw = false;
-                        if (type == 8) shouldDraw = (nType == 0);
+                        if (isWater(type)) {
+                            if (nType == 0 || (!isOpaque(nType) && !isWater(nType))) {
+                                shouldDraw = true;
+                            } else if (isWater(nType)) {
+                                bool thisWaterAbove = isWater(getVoxel(x, y + 1, z));
+                                bool nWaterAbove = isWater(getVoxel(x + 1, y + 1, z));
+                                float thisHeight = thisWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(type) * 0.11f));
+                                float nHeight = nWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(nType) * 0.11f));
+                                shouldDraw = (thisHeight > nHeight);
+                            }
+                        }
                         else if (!isOpaque(type)) shouldDraw = (nType == 0 || nType != type);
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
@@ -137,7 +160,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                             uint64_t lightKey = (l0 << 12) | (l1 << 8) | (l2 << 4) | l3;
                             uint8_t aoKey = (s0 << 6) | (s1 << 4) | (s2 << 2) | s3;
                             bool isVeg = (type == 5 || type == 9 || type == 10 || type == 11 || type == 12 || type == 21 || type == 22 || type == 26);
-                            uint64_t gY = isVeg ? getVoxelGroundY(x, y, z) : 0;
+                            uint64_t gY = 0;
+                            if (isVeg) gY = getVoxelGroundY(x, y, z);
+                            else if (isWater(type)) gY = isWater(getVoxel(x, y + 1, z)) ? 0 : 1;
                             mask[(y - y0) * CHUNK_SIZE + (z - z0)] = (lightKey << 24) | (gY << 16) | ((uint64_t)type << 8) | aoKey;
                         }
                     }
@@ -152,11 +177,11 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         uint8_t gY = (maskVal >> 16) & 0xFF;
                         uint16_t lightKey = (maskVal >> 24) & 0xFFFF;
                         int w = 1;
-                        if (type != 8) { while (z + w < z1 && mask[(y - y0) * CHUNK_SIZE + (z + w - z0)] == maskVal) w++;
+                        if (!isWater(type)) { while (z + w < z1 && mask[(y - y0) * CHUNK_SIZE + (z + w - z0)] == maskVal) w++;
                         }
                         int h = 1;
                         bool canGrow = true;
-                        if (type != 8) { while (y + h < y1 && canGrow) {
+                        if (!isWater(type)) { while (y + h < y1 && canGrow) {
                             for (int k = 0; k < w; k++) {
                                 if (mask[(y + h - y0) * CHUNK_SIZE + (z + k - z0)] != maskVal) { canGrow = false; break; }
                             }
@@ -202,7 +227,17 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                     if (type > 0) {
                         uint8_t nType = getVoxel(x - 1, y, z);
                         bool shouldDraw = false;
-                        if (type == 8) shouldDraw = (nType == 0);
+                        if (isWater(type)) {
+                            if (nType == 0 || (!isOpaque(nType) && !isWater(nType))) {
+                                shouldDraw = true;
+                            } else if (isWater(nType)) {
+                                bool thisWaterAbove = isWater(getVoxel(x, y + 1, z));
+                                bool nWaterAbove = isWater(getVoxel(x - 1, y + 1, z));
+                                float thisHeight = thisWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(type) * 0.11f));
+                                float nHeight = nWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(nType) * 0.11f));
+                                shouldDraw = (thisHeight > nHeight);
+                            }
+                        }
                         else if (!isOpaque(type)) shouldDraw = (nType == 0 || nType != type);
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
@@ -235,11 +270,11 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         uint8_t gY = (maskVal >> 16) & 0xFF;
                         uint16_t lightKey = (maskVal >> 24) & 0xFFFF;
                         int w = 1;
-                        if (type != 8) { while (z + w < z1 && mask[(y - y0) * CHUNK_SIZE + (z + w - z0)] == maskVal) w++;
+                        if (!isWater(type)) { while (z + w < z1 && mask[(y - y0) * CHUNK_SIZE + (z + w - z0)] == maskVal) w++;
                         }
                         int h = 1;
                         bool canGrow = true;
-                        if (type != 8) { while (y + h < y1 && canGrow) {
+                        if (!isWater(type)) { while (y + h < y1 && canGrow) {
                             for (int k = 0; k < w; k++) {
                                 if (mask[(y + h - y0) * CHUNK_SIZE + (z + k - z0)] != maskVal) { canGrow = false; break; }
                             }
@@ -285,7 +320,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                     if (type > 0) {
                         uint8_t nType = getVoxel(x, y + 1, z);
                         bool shouldDraw = false;
-                        if (type == 8) shouldDraw = (nType == 0);
+                        if (isWater(type)) {
+                            shouldDraw = (nType == 0 || (!isOpaque(nType) && !isWater(nType)));
+                        }
                         else if (!isOpaque(type)) shouldDraw = (nType == 0 || nType != type);
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
@@ -371,7 +408,9 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                     if (type > 0) {
                         uint8_t nType = getVoxel(x, y - 1, z);
                         bool shouldDraw = false;
-                        if (type == 8) shouldDraw = (nType == 0);
+                        if (isWater(type)) {
+                            shouldDraw = (nType == 0 || (!isOpaque(nType) && !isWater(nType)));
+                        }
                         else if (!isOpaque(type)) shouldDraw = (nType == 0 || nType != type);
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
@@ -404,12 +443,12 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         uint8_t gY = (maskVal >> 16) & 0xFF;
                         uint16_t lightKey = (maskVal >> 24) & 0xFFFF;
                         int w = 1;
-                        if (type != 8) {
+                        if (!isWater(type)) {
                             while (z + w < z1 && mask[(x - x0) * CHUNK_SIZE + (z + w - z0)] == maskVal) w++;
                         }
                         int h = 1;
                         bool canGrow = true;
-                        if (type != 8) {
+                        if (!isWater(type)) {
                             while (x + h < x1 && canGrow) {
                                 for (int k = 0; k < w; k++) {
                                     if (mask[(x + h - x0) * CHUNK_SIZE + (z + k - z0)] != maskVal) { canGrow = false; break; }
@@ -457,7 +496,17 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                     if (type > 0) {
                         uint8_t nType = getVoxel(x, y, z + 1);
                         bool shouldDraw = false;
-                        if (type == 8) shouldDraw = (nType == 0);
+                        if (isWater(type)) {
+                            if (nType == 0 || (!isOpaque(nType) && !isWater(nType))) {
+                                shouldDraw = true;
+                            } else if (isWater(nType)) {
+                                bool thisWaterAbove = isWater(getVoxel(x, y + 1, z));
+                                bool nWaterAbove = isWater(getVoxel(x, y + 1, z + 1));
+                                float thisHeight = thisWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(type) * 0.11f));
+                                float nHeight = nWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(nType) * 0.11f));
+                                shouldDraw = (thisHeight > nHeight);
+                            }
+                        }
                         else if (!isOpaque(type)) shouldDraw = (nType == 0 || nType != type);
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
@@ -490,12 +539,12 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         uint8_t gY = (maskVal >> 16) & 0xFF;
                         uint16_t lightKey = (maskVal >> 24) & 0xFFFF;
                         int w = 1;
-                        if (type != 8) {
+                        if (!isWater(type)) {
                             while (y + w < y1 && mask[(x - x0) * CHUNK_SIZE + (y + w - y0)] == maskVal) w++;
                         }
                         int h = 1;
                         bool canGrow = true;
-                        if (type != 8) {
+                        if (!isWater(type)) {
                             while (x + h < x1 && canGrow) {
                                 for (int k = 0; k < w; k++) {
                                     if (mask[(x + h - x0) * CHUNK_SIZE + (y + k - y0)] != maskVal) { canGrow = false; break; }
@@ -543,7 +592,17 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                     if (type > 0) {
                         uint8_t nType = getVoxel(x, y, z - 1);
                         bool shouldDraw = false;
-                        if (type == 8) shouldDraw = (nType == 0);
+                        if (isWater(type)) {
+                            if (nType == 0 || (!isOpaque(nType) && !isWater(nType))) {
+                                shouldDraw = true;
+                            } else if (isWater(nType)) {
+                                bool thisWaterAbove = isWater(getVoxel(x, y + 1, z));
+                                bool nWaterAbove = isWater(getVoxel(x, y + 1, z - 1));
+                                float thisHeight = thisWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(type) * 0.11f));
+                                float nHeight = nWaterAbove ? 1.0f : (1.0f - (0.1f + getWaterLevel(nType) * 0.11f));
+                                shouldDraw = (thisHeight > nHeight);
+                            }
+                        }
                         else if (!isOpaque(type)) shouldDraw = (nType == 0 || nType != type);
                         else shouldDraw = (nType == 0 || !isOpaque(nType));
 
@@ -576,12 +635,12 @@ void performGreedyMeshing(std::vector<VoxelVertex>& v, std::vector<VoxelVertex>&
                         uint8_t gY = (maskVal >> 16) & 0xFF;
                         uint16_t lightKey = (maskVal >> 24) & 0xFFFF;
                         int w = 1;
-                        if (type != 8) {
+                        if (!isWater(type)) {
                             while (y + w < y1 && mask[(x - x0) * CHUNK_SIZE + (y + w - y0)] == maskVal) w++;
                         }
                         int h = 1;
                         bool canGrow = true;
-                        if (type != 8) {
+                        if (!isWater(type)) {
                             while (x + h < x1 && canGrow) {
                                 for (int k = 0; k < w; k++) {
                                     if (mask[(x + h - x0) * CHUNK_SIZE + (y + k - y0)] != maskVal) { canGrow = false; break; }

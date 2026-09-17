@@ -116,9 +116,9 @@ void updatePhysics() {
         int py_legs = static_cast<int>(floor((cameraPos.y - playerHeight * 0.5f) / voxelSize));
         bool inWater = false;
         {
-            if ((py_feet >= 0 && py_feet < WORLD_HEIGHT && getVoxel(px, py_feet, pz) == 8) ||
-                (py_legs >= 0 && py_legs < WORLD_HEIGHT && getVoxel(px, py_legs, pz) == 8) ||
-                (py >= 0 && py < WORLD_HEIGHT && getVoxel(px, py, pz) == 8)) {
+            if ((py_feet >= 0 && py_feet < WORLD_HEIGHT && isWater(getVoxel(px, py_feet, pz))) ||
+                (py_legs >= 0 && py_legs < WORLD_HEIGHT && isWater(getVoxel(px, py_legs, pz))) ||
+                (py >= 0 && py < WORLD_HEIGHT && isWater(getVoxel(px, py, pz)))) {
                 inWater = true;
             }
         }
@@ -214,7 +214,7 @@ void updatePhysics() {
     if (destructionPending && (swingTimer > 0.0f && swingTimer < 0.16f)) {
         // The physical sweep delta is too small and often misses or hits the player's own shapes.
         // Using a standard camera forward raycast is much more reliable and aligns with where the player aims.
-        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 4.0f, 150.0f, 1.0f);
+        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 4.0f, 150.0f, 1.0f, 100.0f);
         if (res.hit) {
             hammerHitThisFrame = true;
             hammerHitWorldPos = res.hitPos;

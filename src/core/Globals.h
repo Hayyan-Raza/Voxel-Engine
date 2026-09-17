@@ -69,6 +69,8 @@ void initializeGlobals();
 extern float deltaTime;
 extern float lastFrame;
 
+extern GameMode g_gameMode;
+
 // ---- Settings ----
 extern float g_fogDensity;
 extern float dayNightSpeed;
@@ -82,6 +84,7 @@ extern float chunkLifeMultiplier;
 extern glm::vec3 waterShallowColor;
 extern glm::vec3 waterDeepColor;
 extern float waterSkyBlend;
+extern bool enableWaterReflections;
 extern float waterWaveSpeed;
 extern float vegetationSwaySpeed;
 extern float vegetationSwayIntensity;

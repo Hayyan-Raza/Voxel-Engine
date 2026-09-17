@@ -175,6 +175,46 @@ void UIManager::renderLoadingScreenMeshes(GLFWwindow* window, int loadedMeshes, 
     glfwSwapBuffers(window);
 }
 
+void UIManager::renderStartupMenu(GLFWwindow* window) {
+    int fbW_int, fbH_int;
+    glfwGetFramebufferSize(window, &fbW_int, &fbH_int);
+    glViewport(0, 0, fbW_int, fbH_int);
+    
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    
+    ImGui::SetNextWindowPos(ImVec2(fbW_int/2.0f - 200.0f, fbH_int/2.0f - 150.0f));
+    ImGui::SetNextWindowSize(ImVec2(400, 300));
+    ImGui::Begin("World Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+    
+    ImGui::SetWindowFontScale(1.5f);
+    ImGui::Text("Select Game Mode");
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    if (ImGui::Button("Infinite World", ImVec2(-1, 60))) {
+        g_gameMode = GameMode::Infinite;
+    }
+    
+    ImGui::Spacing();
+    
+    if (ImGui::Button("Skyblock Version (9 Chunks)", ImVec2(-1, 60))) {
+        g_gameMode = GameMode::Skyblock;
+    }
+    
+    ImGui::End();
+    
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    glfwSwapBuffers(window);
+}
+
 void UIManager::renderUI(GLFWwindow* window, float deltaTime, const glm::vec3& cameraPos, const glm::vec3& cameraFront, const glm::mat4& view, const glm::mat4& proj) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();

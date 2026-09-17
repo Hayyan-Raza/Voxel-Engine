@@ -7,6 +7,12 @@
 // --- Per-voxel position in island BFS ---
 struct VoxelPos { int x, y, z; };
 
+enum class GameMode {
+    MainMenu,
+    Infinite,
+    Skyblock
+};
+
 // --- Frustum Culling Types ---
 struct Plane {
     glm::vec3 normal;

@@ -17,7 +17,7 @@ struct RaycastResult {
 VoxelChunk* checkGrabbableChunkRaycast(const glm::vec3& startPt, const glm::vec3& rayDir, float maxReach);
 
 // Raycasts against mobs, ragdolls, loose chunks, and terrain
-RaycastResult performWeaponRaycast(const glm::vec3& startPt, const glm::vec3& rayDir, float maxReach, float impulseForce, float damageRadius);
+RaycastResult performWeaponRaycast(const glm::vec3& startPt, const glm::vec3& rayDir, float maxReach, float impulseForce, float damageRadius, float damageAmount = 0.0f);
 
 // Special raycast for finding an empty voxel adjacent to a solid voxel
 bool performPlacementRaycast(glm::vec3 startPt, glm::vec3 rayDir, float maxReach, glm::ivec3& outPlaceVox);

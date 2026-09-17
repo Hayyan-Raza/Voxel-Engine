@@ -44,7 +44,7 @@ void islandWorker() {
             if (startPos.y < 0 || startPos.y >= WORLD_HEIGHT) continue;
 
             uint8_t voxelType = getVoxel(startPos.x, startPos.y, startPos.z);
-            if (voxelType == 0 || voxelType == 8 || clearedVoxels.count(startPos)) continue;
+            if (voxelType == 0 || isWater(voxelType) || clearedVoxels.count(startPos)) continue;
             if (nodeStatus[startPos] != 0) continue;
 
             std::vector<glm::ivec3> cluster;

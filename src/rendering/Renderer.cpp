@@ -236,7 +236,7 @@ void drawGhostBlock(GLint modelLoc, GLint colorLoc, GLuint cubeVAO) {
     else if (type == 3) { r = 0.55f; g = 0.55f; b = 0.55f; }
     else if (type == 4) { r = 0.35f; g = 0.25f; b = 0.15f; }
     else if (type == 5) { r = 0.65f; g = 0.85f; b = 0.15f; }
-    else if (type == 8) { r = 0.15f; g = 0.45f; b = 0.85f; }
+    else if (isWater(type)) { r = 0.15f; g = 0.45f; b = 0.85f; }
     else if (type == 9)  { r = 0.92f; g = 0.15f; b = 0.18f; }
     else if (type == 10) { r = 0.96f; g = 0.82f; b = 0.10f; }
     else if (type == 11) { r = 0.62f; g = 0.25f; b = 0.88f; }
@@ -416,7 +416,7 @@ void drawBuildingGizmo(GLint modelLoc, GLint colorLoc, GLuint cubeVAO) {
         else if (type == 3) { r = 0.55f; g = 0.55f; b = 0.55f; }
         else if (type == 4) { r = 0.35f; g = 0.25f; b = 0.15f; }
         else if (type == 5) { r = 0.65f; g = 0.85f; b = 0.15f; }
-        else if (type == 8) { r = 0.15f; g = 0.45f; b = 0.85f; }
+        else if (isWater(type)) { r = 0.15f; g = 0.45f; b = 0.85f; }
         else if (type == 9)  { r = 0.92f; g = 0.15f; b = 0.18f; }
         else if (type == 10) { r = 0.96f; g = 0.82f; b = 0.10f; }
         else if (type == 11) { r = 0.62f; g = 0.25f; b = 0.88f; }

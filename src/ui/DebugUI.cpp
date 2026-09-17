@@ -56,6 +56,7 @@ void drawConfigMenu(GLFWwindow* window) {
         ImGui::ColorEdit3("Shallow Color", glm::value_ptr(waterShallowColor));
         ImGui::ColorEdit3("Deep Color", glm::value_ptr(waterDeepColor));
         ImGui::SliderFloat("Sky Blend", &waterSkyBlend, 0.0f, 1.0f);
+        ImGui::Checkbox("Reflections (SSR)", &enableWaterReflections);
         ImGui::SliderFloat("Water Wave Speed", &waterWaveSpeed, 0.0f, 5.0f);
     }
     ImGui::Separator();

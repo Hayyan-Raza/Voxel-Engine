@@ -177,7 +177,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
             for (int z = -1; z <= 1; z++) {
                 float dx = (x + 2.0f) / 2.0f;
                 if (dx*dx + y*y + z*z <= 2.2f) {
-                    addVoxelSafe(1, x, y, z, RAGDOLL_MUSH_BEIGE);
+                    addVoxelSafe(1, x + 3, y, z, RAGDOLL_MUSH_BEIGE);
                 }
             }
         }
@@ -188,7 +188,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
             for (int z = -1; z <= 1; z++) {
                 float dx = (x - 2.0f) / 2.0f;
                 if (dx*dx + y*y + z*z <= 2.2f) {
-                    addVoxelSafe(2, x, y, z, RAGDOLL_MUSH_BEIGE);
+                    addVoxelSafe(2, x - 3, y, z, RAGDOLL_MUSH_BEIGE);
                 }
             }
         }
@@ -200,7 +200,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
         for (int sx = -1; sx <= 1; sx++) {
             for (int sz = -1; sz <= 1; sz++) {
                 if (sx*sx + sz*sz <= 1) {
-                    addVoxelSafe(2, sx + staffX, y, sz, RAGDOLL_MUSH_BROWN);
+                    addVoxelSafe(2, sx + staffX - 3, y, sz, RAGDOLL_MUSH_BROWN);
                 }
             }
         }
@@ -210,7 +210,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
         for (int x = -2; x <= 2; x++) {
             for (int z = -2; z <= 2; z++) {
                 if (abs(x) + abs(y-14) + abs(z) <= 3) {
-                    addVoxelSafe(2, x + staffX, y, z, RAGDOLL_MUSH_BLUE);
+                    addVoxelSafe(2, x + staffX - 3, y, z, RAGDOLL_MUSH_BLUE);
                 }
             }
         }
@@ -218,7 +218,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
     // Green leaf
     for (int x = 2; x <= 4; x++) {
         for (int y = 8; y <= 11; y++) {
-            addVoxelSafe(2, x + staffX, y, 0, RAGDOLL_MUSH_GREEN);
+            addVoxelSafe(2, x + staffX - 3, y, 0, RAGDOLL_MUSH_GREEN);
         }
     }
 
@@ -230,7 +230,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
                 float dy = (y + 2.0f) / 2.0f;
                 float dx = (x + 0.5f) / 1.5f;
                 if (dx*dx + dy*dy + z*z <= 2.0f) {
-                    addVoxelSafe(3, x, y, z, RAGDOLL_MUSH_BEIGE);
+                    addVoxelSafe(3, x + 1, y + 2, z, RAGDOLL_MUSH_BEIGE);
                 }
             }
         }
@@ -242,7 +242,7 @@ void spawnLivingMushroom(const glm::vec3& position) {
                 float dy = (y + 2.0f) / 2.0f;
                 float dx = (x - 0.5f) / 1.5f;
                 if (dx*dx + dy*dy + z*z <= 2.0f) {
-                    addVoxelSafe(4, x, y, z, RAGDOLL_MUSH_BEIGE);
+                    addVoxelSafe(4, x - 1, y + 2, z, RAGDOLL_MUSH_BEIGE);
                 }
             }
         }
@@ -281,8 +281,14 @@ void updateMobs(float dt) {
             
             // Random direction
             float randAngle = (rand() % 360) * 3.14159f / 180.0f;
-            m->yaw = randAngle;
+            m->targetYaw = randAngle;
         }
+
+        // Smooth rotation
+        float diff = m->targetYaw - m->yaw;
+        while (diff > 3.14159f) diff -= 6.28318f;
+        while (diff < -3.14159f) diff += 6.28318f;
+        m->yaw += diff * 5.0f * dt;
 
         float scaleFactor = voxelSize / 0.01f;
 
@@ -330,26 +336,45 @@ void updateMobs(float dt) {
         m->renderParts[0].center = m->position;
         
         // Animation
-        m->animTime += dt;
+        bool isMoving = (m->wanderTimer > 1.0f || m->panicTimer > 0.0f);
         
         if (m->type == MOB_MUSHROOM && m->renderParts.size() == 5) {
-            // Cute bobbing animation
-            float bobSpeed = (m->panicTimer > 0.0f) ? 12.0f : 5.0f;
-            float bobAmount = (m->panicTimer > 0.0f) ? 0.015f : 0.008f;
-            float bob = sin(m->animTime * bobSpeed) * bobAmount * scaleFactor;
+            float bobSpeed = (m->panicTimer > 0.0f) ? 15.0f : 8.0f;
+            
+            if (isMoving) {
+                m->animTime += dt;
+            } else {
+                float target = round(m->animTime * bobSpeed / 3.14159265f) * 3.14159265f / bobSpeed;
+                m->animTime += (target - m->animTime) * 10.0f * dt;
+            }
+
+            // Cute bobbing & hopping animation
+            float bobAmount = (m->panicTimer > 0.0f) ? 0.03f : 0.015f;
+            float walkAnim = m->animTime * bobSpeed;
+            float bob = std::abs(sin(walkAnim)) * bobAmount * scaleFactor;
             m->renderParts[0].center.y += bob;
             
-            // Slight tilt when walking (lean into the walk)
-            float tiltAmount = (m->panicTimer > 0.0f) ? 0.12f : 0.06f;
-            float tilt = sin(m->animTime * bobSpeed) * tiltAmount;
-            glm::quat walkTilt = glm::angleAxis(tilt, glm::vec3(0, 0, 1));
+            // Squash and Stretch based on bobbing
+            float squash = sin(walkAnim * 2.0f) * 0.1f; 
+            m->renderParts[0].scale = glm::vec3(1.0f - squash * 0.5f, 1.0f + squash, 1.0f - squash * 0.5f);
+            
+            // Hopping effect when panicked
+            if (m->panicTimer > 0.0f && sin(walkAnim) > 0.9f && m->velocity.y == 0.0f) {
+                m->velocity.y = 4.0f * scaleFactor;
+            }
+            
+            // Slight tilt and wobble
+            float tiltAmount = (m->panicTimer > 0.0f) ? 0.15f : 0.08f;
+            float tilt = sin(walkAnim) * tiltAmount;
+            float capWobble = cos(walkAnim * 2.0f) * 0.05f;
+            glm::quat walkTilt = glm::angleAxis(tilt, glm::vec3(0, 0, 1)) * glm::angleAxis(capWobble, glm::vec3(1, 0, 0));
             glm::quat baseRot = glm::angleAxis(m->yaw, glm::vec3(0, 1, 0));
             m->renderParts[0].rotation = baseRot * walkTilt;
             
             // Walk cycle for limbs
-            float walkAnim = sin(m->animTime * bobSpeed * 1.5f); // Phase of walk
-            float armSwing = walkAnim * 0.4f;
-            float legSwing = walkAnim * 0.5f;
+            float limbAnim = sin(m->animTime * bobSpeed * 1.5f); // Phase of walk
+            float armSwing = limbAnim * 0.4f;
+            float legSwing = limbAnim * 0.5f;
             
             // Left Arm
             m->renderParts[1].rotation = baseRot * glm::angleAxis(armSwing, glm::vec3(1, 0, 0));
@@ -369,6 +394,7 @@ void updateMobs(float dt) {
 
         } else {
             m->renderParts[0].rotation = glm::angleAxis(m->yaw, glm::vec3(0, 1, 0));
+            m->renderParts[0].scale = glm::vec3(1.0f);
         }
 
         i++;
@@ -388,6 +414,7 @@ void drawMobs(int modelLoc, int colorLoc, int shadowLoc) {
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, p.center);
             model *= glm::mat4_cast(p.rotation);
+            model = glm::scale(model, p.scale);
             
             if (modelLoc != -1) {
                 glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);

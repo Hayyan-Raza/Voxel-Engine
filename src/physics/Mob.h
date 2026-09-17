@@ -17,6 +17,7 @@ struct Mob {
     glm::vec3 position;
     glm::vec3 velocity{0.0f};
     float yaw = 0.0f; // facing direction
+    float targetYaw = 0.0f; // target direction for smooth turning
 
     std::vector<RagdollPart> renderParts; // Used for drawing the mob's distinct pieces
 

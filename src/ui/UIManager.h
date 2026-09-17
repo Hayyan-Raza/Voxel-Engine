@@ -13,6 +13,9 @@ public:
     // Render the initial loading screen when starting
     void renderLoadingScreenInitial(GLFWwindow* window);
     
+    // Render the startup main menu
+    void renderStartupMenu(GLFWwindow* window);
+    
     // Render the loading screen while meshes are being loaded
     void renderLoadingScreenMeshes(GLFWwindow* window, int loadedMeshes, int maxMeshes);
     

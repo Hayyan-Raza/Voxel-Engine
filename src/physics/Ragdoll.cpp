@@ -160,9 +160,41 @@ void updateRagdolls(float dt) {
             }
         }
 
-        // 3. --- Solve Joint Constraints ---
+        // 3. --- Solve Joint Constraints & Self-Collision ---
         const int iterations = 8;
         for (int iter = 0; iter < iterations; iter++) {
+            // Self-Collision (Prevent parts from clipping into each other, but ignore joined parts)
+            for (size_t i = 0; i < ragdoll.parts.size(); i++) {
+                for (size_t j = i + 1; j < ragdoll.parts.size(); j++) {
+                    // Check if they share a joint
+                    bool connected = false;
+                    for (const auto& jt : ragdoll.joints) {
+                        if ((jt.partA == i && jt.partB == j) || (jt.partA == j && jt.partB == i)) {
+                            connected = true;
+                            break;
+                        }
+                    }
+                    if (connected) continue;
+
+                    RagdollPart& pA = ragdoll.parts[i];
+                    RagdollPart& pB = ragdoll.parts[j];
+                    glm::vec3 delta = pB.center - pA.center;
+                    float dist = glm::length(delta);
+                    float minDist = pA.radius + pB.radius;
+                    if (dist < minDist && dist > 0.0001f) {
+                        float penetration = minDist - dist;
+                        glm::vec3 normal = delta / dist;
+                        float totalMass = pA.mass + pB.mass;
+                        float wA = pB.mass / totalMass;
+                        float wB = pA.mass / totalMass;
+                        glm::vec3 correction = normal * penetration * 0.2f; // Soft push
+                        pA.center -= correction * wA;
+                        pB.center += correction * wB;
+                    }
+                }
+            }
+
+            // Joint constraints
             for (auto& j : ragdoll.joints) {
                 RagdollPart& pA = ragdoll.parts[j.partA];
                 RagdollPart& pB = ragdoll.parts[j.partB];
@@ -220,6 +252,7 @@ void drawRagdolls(GLint modelLoc, GLint colorLoc, GLint shadowLoc) {
 
             glm::mat4 model = glm::translate(glm::mat4(1.0f), part.center);
             model *= glm::toMat4(part.rotation);
+            model = glm::scale(model, part.scale);
 
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
             glUniform4f(colorLoc, 1.0f, 1.0f, 1.0f, 1.0f);

@@ -33,6 +33,7 @@ void drawResourceInventory() {
     if (drawResource(resourceInventory[3], "Stone", ImVec4(0.50f, 0.50f, 0.50f, 1.0f))) hasResources = true;
     if (drawResource(resourceInventory[4], "Wood", ImVec4(0.55f, 0.27f, 0.07f, 1.0f))) hasResources = true;
     if (drawResource(resourceInventory[5], "Leaves", ImVec4(0.13f, 0.55f, 0.13f, 1.0f))) hasResources = true;
+    if (drawResource(resourceInventory[8], "Water", ImVec4(0.15f, 0.45f, 0.85f, 1.0f))) hasResources = true;
     
     if (!hasResources) {
         ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Empty");

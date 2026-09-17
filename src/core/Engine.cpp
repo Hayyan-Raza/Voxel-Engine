@@ -22,6 +22,7 @@
 #include "../player/WeaponSystem.h"
 #include "../player/Weapons.h"
 #include "../input/Input.h"
+#include "../world/WaterSimulator.h"
 
 bool Engine::init() {
     std::cout << "Engine Startup...\n";
@@ -58,11 +59,9 @@ bool Engine::init() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     uiManager.init(window);
-
-    uiManager.renderLoadingScreenInitial(window);
 
     initAudio();
     initIslandThread();
@@ -71,32 +70,13 @@ bool Engine::init() {
     initLightingThread();
     initMesherThread();
     
-    std::cout << "Generating terrain..." << std::endl;
-    generateTerrain();
-
-    // Set spawn chunk position based on camera position
-    spawnChunkPos = glm::ivec2(
-        (int)(cameraPos.x / (CHUNK_SIZE * voxelSize)),
-        (int)(cameraPos.z / (CHUNK_SIZE * voxelSize))
-    );
-
-    updateActiveChunks(cameraPos);
-    updateStaticMesh(cameraPos);
-
+    // Terrain generation and initial loading screen moved to run() loop after GameMode is selected
     
-    
+    WaterSimulator::getInstance().init();
     initWeaponModels();
     InitWeapons();
 
     renderPipeline.init(800, 600);
-
-    float loadStartTime = glfwGetTime();
-    while (isTerrainGenerating() && (glfwGetTime() - loadStartTime < 15.0f) && !glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-        updateActiveChunks(cameraPos);
-        updateStaticMesh(cameraPos);
-        uiManager.renderLoadingScreenMeshes(window, activeStaticMeshes.size(), 0);
-    }
 
     isInitialLoading = false;
 
@@ -136,6 +116,7 @@ void Engine::updateGameLogic() {
         updateChunkPhysics();
         spawnFallingLeaves(cameraPos);
         updateParticles();
+        WaterSimulator::getInstance().update();
         updateMobs(deltaTime);
         if (g_buildingSystem.GetCurrentState() == UI::BuildModeState::Inactive) {
             handleDestruction(window);
@@ -145,6 +126,39 @@ void Engine::updateGameLogic() {
 
 void Engine::run() {
     while (!glfwWindowShouldClose(window)) {
+        if (g_gameMode == GameMode::MainMenu) {
+            uiManager.renderStartupMenu(window);
+            glfwPollEvents();
+            
+            if (g_gameMode != GameMode::MainMenu) {
+                // User just selected a mode!
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                
+                // Set spawn chunk position based on camera position
+                spawnChunkPos = glm::ivec2(
+                    (int)(cameraPos.x / (CHUNK_SIZE * voxelSize)),
+                    (int)(cameraPos.z / (CHUNK_SIZE * voxelSize))
+                );
+
+                std::cout << "Generating terrain..." << std::endl;
+                generateTerrain();
+
+                updateActiveChunks(cameraPos);
+                updateStaticMesh(cameraPos);
+
+                float loadStartTime = glfwGetTime();
+                while (isTerrainGenerating() && (glfwGetTime() - loadStartTime < 15.0f) && !glfwWindowShouldClose(window)) {
+                    glfwPollEvents();
+                    updateActiveChunks(cameraPos);
+                    updateStaticMesh(cameraPos);
+                    uiManager.renderLoadingScreenMeshes(window, activeStaticMeshes.size(), 0);
+                }
+                
+                lastFrame = static_cast<float>(glfwGetTime());
+            }
+            continue;
+        }
+
         if (enableWireframe) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         } else {

@@ -4,6 +4,7 @@
 #include "../physics/IslandDetection.h"
 #include "../particles/Particles.h"
 #include "../core/Globals.h"
+#include "../world/WaterSimulator.h"
 
 void applyTerrainDestruction(const glm::ivec3& hitVox, const glm::vec3& hitWorldPos, int radius, const glm::vec3& ejectBaseDir) {
     uint8_t hitVType = getVoxel(hitVox.x, hitVox.y, hitVox.z);
@@ -31,7 +32,7 @@ void applyTerrainDestruction(const glm::ivec3& hitVox, const glm::vec3& hitWorld
                 if (gy < 0 || gy >= WORLD_HEIGHT) continue;
                 uint8_t vType = getVoxel(gx, gy, gz);
                 if (vType == 3 && gy <= 8) continue; // Bedrock protection
-                if (vType == 8) continue; // Ignore water
+                if (isWater(vType)) continue; // Water is unaffected by damage
 
                 if (vType > 0) {
                     
@@ -44,8 +45,10 @@ void applyTerrainDestruction(const glm::ivec3& hitVox, const glm::vec3& hitWorld
                         int nx = gx + nb[i][0], ny = gy + nb[i][1], nz = gz + nb[i][2];
                         if (ny >= 0 && ny < WORLD_HEIGHT && getVoxel(nx, ny, nz) > 0)
                             stabilityNodes.push_back(glm::ivec3(nx,ny,nz));
+                        WaterSimulator::getInstance().wakeUp(nx, ny, nz);
                     }
                     setVoxel(gx, gy, gz, 0);
+                    WaterSimulator::getInstance().wakeUp(gx, gy, gz);
                     markChunkDirty(gx, gy, gz);
                 }
             }
@@ -94,7 +97,7 @@ void extractTerrainToChunk(const glm::ivec3& hitVox, const glm::vec3& pullDir) {
     VoxelChunk debrisChunk;
     glm::vec3 sumPos(0.0f);
 
-    if (hitVType > 0 && !(hitVType == 3 && hitVox.y <= 8)) {
+    if (hitVType > 0 && !(hitVType == 3 && hitVox.y <= 8) && hitVType != 8) {
         debrisChunk.voxels.push_back(std::make_pair(hitVox, hitVType));
         resourceInventory[hitVType]++; // Harvest item
         sumPos = glm::vec3(hitVox) * voxelSize;
@@ -104,8 +107,10 @@ void extractTerrainToChunk(const glm::ivec3& hitVox, const glm::vec3& pullDir) {
             int nx = hitVox.x + nb[i][0], ny = hitVox.y + nb[i][1], nz = hitVox.z + nb[i][2];
             if (ny >= 0 && ny < WORLD_HEIGHT && getVoxel(nx, ny, nz) > 0)
                 stabilityNodes.push_back(glm::ivec3(nx,ny,nz));
+            WaterSimulator::getInstance().wakeUp(nx, ny, nz);
         }
         setVoxel(hitVox.x, hitVox.y, hitVox.z, 0);
+        WaterSimulator::getInstance().wakeUp(hitVox.x, hitVox.y, hitVox.z);
         markChunkDirty(hitVox.x, hitVox.y, hitVox.z);
         rebuildChunkSync(getChunkCoord(hitVox.x), getChunkCoord(hitVox.y), getChunkCoord(hitVox.z));
     }

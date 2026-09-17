@@ -18,6 +18,22 @@ inline int getLocalIdx(int pos) {
     return mod < 0 ? mod + CHUNK_SIZE : mod;
 }
 
+inline bool isWater(uint8_t type) {
+    return type == 8 || (type >= 200 && type <= 206);
+}
+
+inline int getWaterLevel(uint8_t type) {
+    if (type == 8) return 0;
+    if (type >= 200 && type <= 206) return type - 199;
+    return 0;
+}
+
+inline uint8_t getWaterTypeForLevel(int level) {
+    if (level <= 0) return 8;
+    if (level >= 7) return 206;
+    return 199 + level;
+}
+
 struct ivec3_hash {
     std::size_t operator()(const glm::ivec3& v) const {
         return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1) ^ (std::hash<int>()(v.z) << 2);

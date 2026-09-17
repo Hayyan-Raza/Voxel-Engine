@@ -257,10 +257,18 @@ void updateActiveChunks(glm::vec3 cameraPos) {
     std::unordered_set<glm::ivec2, ivec2_hash> desiredColumns;
     desiredColumns.insert(glm::ivec2(spawnChunkPos.x, spawnChunkPos.y)); // Spawn always active
 
-    for (int dx = -renderDistanceChunks; dx <= renderDistanceChunks; dx++) {
-        for (int dz = -renderDistanceChunks; dz <= renderDistanceChunks; dz++) {
-            if (std::max(std::abs(dx), std::abs(dz)) <= renderDistanceChunks) {
-                desiredColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
+    if (g_gameMode == GameMode::Skyblock) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                desiredColumns.insert(glm::ivec2(spawnChunkPos.x + dx, spawnChunkPos.y + dz));
+            }
+        }
+    } else {
+        for (int dx = -renderDistanceChunks; dx <= renderDistanceChunks; dx++) {
+            for (int dz = -renderDistanceChunks; dz <= renderDistanceChunks; dz++) {
+                if (std::max(std::abs(dx), std::abs(dz)) <= renderDistanceChunks) {
+                    desiredColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
+                }
             }
         }
     }
@@ -274,11 +282,13 @@ void updateActiveChunks(glm::vec3 cameraPos) {
     }
 
     std::unordered_set<glm::ivec2, ivec2_hash> keepColumns = desiredColumns;
-    int unloadDistance = renderDistanceChunks + 2;
-    for (int dx = -unloadDistance; dx <= unloadDistance; dx++) {
-        for (int dz = -unloadDistance; dz <= unloadDistance; dz++) {
-            if (std::max(std::abs(dx), std::abs(dz)) <= unloadDistance) {
-                keepColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
+    if (g_gameMode != GameMode::Skyblock) {
+        int unloadDistance = renderDistanceChunks + 2;
+        for (int dx = -unloadDistance; dx <= unloadDistance; dx++) {
+            for (int dz = -unloadDistance; dz <= unloadDistance; dz++) {
+                if (std::max(std::abs(dx), std::abs(dz)) <= unloadDistance) {
+                    keepColumns.insert(glm::ivec2(pcx + dx, pcz + dz));
+                }
             }
         }
     }

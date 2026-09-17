@@ -57,7 +57,7 @@ void AK47Weapon::Update(float dt, bool leftClick, bool leftMouseWasPressed) {
         muzzleFlashPos = muzzlePos;
         
         // Fire bullet!
-        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 6.0f, 7.0f, 0.12f);
+        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 6.0f, 7.0f, 0.12f, 50.0f);
         if (res.hitTerrain) {
             applyTerrainDestruction(res.hitVox, res.hitPos, 1, -cameraFront);
         }
@@ -131,7 +131,7 @@ void GlockWeapon::Update(float dt, bool leftClick, bool leftMouseWasPressed) {
         muzzleFlashTimer = 0.05f;
         muzzleFlashPos = muzzlePos;
 
-        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 6.0f, 5.0f, 0.12f);
+        RaycastResult res = performWeaponRaycast(cameraPos, cameraFront, 6.0f, 5.0f, 0.12f, 30.0f);
         if (res.hitTerrain) {
             applyTerrainDestruction(res.hitVox, res.hitPos, 1, -cameraFront);
         }
@@ -161,7 +161,7 @@ void ShotgunWeapon::Update(float dt, bool leftClick, bool leftMouseWasPressed) {
                 camRight * ((rand()%200-100)*0.01f * spread) + 
                 camUpActual * ((rand()%200-100)*0.01f * spread));
 
-            RaycastResult res = performWeaponRaycast(cameraPos, pelletDir, 5.0f, 8.0f, 0.14f);
+            RaycastResult res = performWeaponRaycast(cameraPos, pelletDir, 5.0f, 8.0f, 0.14f, 20.0f);
             if (res.hitTerrain) {
                 applyTerrainDestruction(res.hitVox, res.hitPos, 1, -pelletDir);
             }

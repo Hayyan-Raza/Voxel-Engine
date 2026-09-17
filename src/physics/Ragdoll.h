@@ -39,6 +39,7 @@ struct RagdollPart {
     const char* name = "Unknown";
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 center{0.0f};
+    glm::vec3 scale{1.0f};
     glm::vec3 velocity{0.0f};
     glm::vec3 angularVelocity{0.0f};
     glm::vec3 extents{0.04f, 0.04f, 0.04f}; // local half-extents

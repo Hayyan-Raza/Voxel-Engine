@@ -1,5 +1,6 @@
 #include "BuildingSystem.h"
 #include "../world/World.h"
+#include "../world/WaterSimulator.h"
 #include "../core/Globals.h"
 #include <cmath>
 #include <iostream>
@@ -363,6 +364,7 @@ void BuildingSystem::GenerateBox(const glm::ivec3& center, const glm::ivec3& ext
             for (int z = center.z - extents.z; z <= center.z + extents.z; ++z) {
                 if (y >= 0 && y < WORLD_HEIGHT) {
                     setVoxel(x, y, z, material);
+                    if (isWater(material)) WaterSimulator::getInstance().wakeUp(x, y, z);
                     markChunkDirty(x, y, z);
                 }
             }
@@ -381,6 +383,7 @@ void BuildingSystem::GenerateSphere(const glm::ivec3& center, const glm::ivec3& 
                 if (dx*dx + dy*dy + dz*dz <= 1.0f) {
                     if (y >= 0 && y < WORLD_HEIGHT) {
                         setVoxel(x, y, z, material);
+                        if (isWater(material)) WaterSimulator::getInstance().wakeUp(x, y, z);
                         markChunkDirty(x, y, z);
                     }
                 }
@@ -399,6 +402,7 @@ void BuildingSystem::GenerateCylinder(const glm::ivec3& center, const glm::ivec3
                 if (dx*dx + dz*dz <= 1.0f) {
                     if (y >= 0 && y < WORLD_HEIGHT) {
                         setVoxel(x, y, z, material);
+                        if (isWater(material)) WaterSimulator::getInstance().wakeUp(x, y, z);
                         markChunkDirty(x, y, z);
                     }
                 }
@@ -418,6 +422,7 @@ void BuildingSystem::GeneratePyramid(const glm::ivec3& center, const glm::ivec3&
             for (int z = center.z - curExtentsZ; z <= center.z + curExtentsZ; ++z) {
                 if (y >= 0 && y < WORLD_HEIGHT) {
                     setVoxel(x, y, z, material);
+                    if (isWater(material)) WaterSimulator::getInstance().wakeUp(x, y, z);
                     markChunkDirty(x, y, z);
                 }
             }

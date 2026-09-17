@@ -190,14 +190,14 @@ static void addLayeredBox(RagdollPart& part,
     }
 }
 
-static void addMushroomCap(RagdollPart& part, int radius) {
+static void addMushroomCap(RagdollPart& part, int radius, int yOff = 0) {
     for (int x = -radius; x <= radius; x++) {
         for (int y = -2; y <= radius; y++) {
             for (int z = -radius; z <= radius; z++) {
                 // Ellipsoid for cap (wider than tall)
                 if (x*x + (y*1.5)*(y*1.5) + z*z <= radius*radius) {
                     RagdollVoxel v;
-                    v.localPos = glm::ivec3(x, y, z);
+                    v.localPos = glm::ivec3(x, y + yOff, z);
                     v.destroyed = false;
                     
                     bool isSpot = false;
@@ -310,23 +310,24 @@ void spawnRagdoll(const glm::vec3& position, const glm::vec3& initialVelocity) {
         RagdollPart& p = ragdoll.parts[Ragdoll::TORSO];
         p.name = "Torso";
         p.center = position + glm::vec3(0.0f, 0.20f * scale, 0.0f);
-        p.mass = 15.0f;
-        p.extents = glm::vec3(0.08f, 0.10f, 0.08f) * scale;
-        p.radius = 0.12f * scale;
-
-        addMushroomBody(p, 6, 12);
-    }
-
-    // --- 2. HEAD (Mushroom Cap) ---
-    {
-        RagdollPart& p = ragdoll.parts[Ragdoll::HEAD];
-        p.name = "Head";
-        p.center = position + glm::vec3(0.0f, 0.35f * scale, 0.0f);
-        p.mass = 6.0f;
-        p.extents = glm::vec3(0.12f, 0.06f, 0.12f) * scale;
+        p.mass = 21.0f; // Body + Cap
+        p.extents = glm::vec3(0.12f, 0.15f, 0.12f) * scale;
         p.radius = 0.15f * scale;
 
-        addMushroomCap(p, 10);
+        addMushroomBody(p, 6, 12);
+        addMushroomCap(p, 10, 15); // Offset cap above body
+    }
+
+    // --- 2. HEAD (Dummy now that cap is on Torso) ---
+    {
+        RagdollPart& p = ragdoll.parts[Ragdoll::HEAD];
+        p.name = "Head_Dummy";
+        p.center = position + glm::vec3(0.0f, 0.35f * scale, 0.0f);
+        p.mass = 1.0f;
+        p.extents = glm::vec3(0.02f, 0.02f, 0.02f) * scale;
+        p.radius = 0.02f * scale;
+
+        addLayeredBox(p, 0, 0, 0, 0, 0, 0, RAGDOLL_MUSH_BEIGE, 0);
     }
     
     // PELVIS (Unused, leave empty or very small)
@@ -485,8 +486,8 @@ void spawnRagdoll(const glm::vec3& position, const glm::vec3& initialVelocity) {
         ragdoll.joints.push_back(j);
     };
 
-    // Neck: Torso top to Head bottom
-    addJoint(Ragdoll::TORSO, Ragdoll::HEAD, glm::vec3(0.0f, 0.06f, 0.0f), glm::vec3(0.0f, -0.02f, 0.0f));
+    // Neck: Dummy tightly bound to Torso
+    addJoint(Ragdoll::TORSO, Ragdoll::HEAD, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
 
     // Arms to Torso
     addJoint(Ragdoll::TORSO, Ragdoll::L_UPPER_ARM, glm::vec3(-0.06f, 0.0f, 0.0f), glm::vec3(0.02f, 0.0f, 0.0f));

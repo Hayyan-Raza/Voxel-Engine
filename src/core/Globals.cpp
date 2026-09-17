@@ -62,6 +62,8 @@ float lastY      =  300.0f;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+GameMode g_gameMode = GameMode::MainMenu;
+
 float g_fogDensity = 0.05f;
 float dayNightSpeed = 0.0f; // Stopped default sun movement to prevent moving shadow artifacts
 Frustum viewFrustum;
@@ -84,6 +86,7 @@ std::atomic<int> playerCurrentChunkZ(16);
 glm::vec3 waterShallowColor = glm::vec3(0.15f, 0.70f, 0.85f);
 glm::vec3 waterDeepColor = glm::vec3(0.02f, 0.20f, 0.60f);
 float waterSkyBlend = 0.5f;
+bool enableWaterReflections = true;
 float waterWaveSpeed = 1.0f;
 float vegetationSwaySpeed = 1.5f;
 float vegetationSwayIntensity = 0.05f;

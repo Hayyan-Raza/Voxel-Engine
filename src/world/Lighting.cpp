@@ -30,7 +30,7 @@ static const int dirs[6][3] = {
 };
 
 bool isOpaque(uint8_t type) {
-    if (type == 0 || type == 8 || type == 9 || type == 10 || type == 11 || type == 12 || type == 13 || type == 14 || type == 5 || type == 21 || type == 22 || type == 26 || type == 27 || type == 28) {
+    if (type == 0 || isWater(type) || type == 9 || type == 10 || type == 11 || type == 12 || type == 13 || type == 14 || type == 5 || type == 21 || type == 22 || type == 26 || type == 27 || type == 28) {
         return false;
     }
     return true;
@@ -99,7 +99,7 @@ void processLighting() {
                 if (isOpaque(neighborType)) continue;
 
                 uint8_t neighborLight = getLight(nx, ny, nz);
-                uint8_t attenuation = (neighborType == 8) ? 2 : 1; 
+                uint8_t attenuation = isWater(neighborType) ? 2 : 1;
                 
                 if (light > attenuation && neighborLight < light - attenuation) {
                     setLight(nx, ny, nz, light - attenuation);

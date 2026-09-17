@@ -35,6 +35,12 @@ private:
     GLuint depthMapFBO = 0;
     GLuint depthMap = 0;
 
+    // Opaque scene copy for SSR
+    GLuint opaqueColorTex = 0;
+    GLuint opaqueDepthTex = 0;
+    int currentOpaqueW = 0;
+    int currentOpaqueH = 0;
+
     // Cached uniform locations (resolved once, used every frame)
     struct {
         GLint view, projection, model, lightSpaceMatrix;
@@ -44,6 +50,7 @@ private:
         GLint uVegSwaySpeed, uVegSwayIntensity;
         GLint uAmbientColor, uDiffuseColor;
         GLint uPointLightPos, uPointLightColor;
+        GLint opaqueColor, opaqueDepth, invView, invProj, uEnableWaterReflections;
     } mainLocs;
 
     struct {

@@ -32,6 +32,15 @@ uniform float uWaterSkyBlend;
 uniform float uWaterWaveSpeed;
 uniform bool uSoftShadows;
 
+// SSR Uniforms
+uniform sampler2D opaqueColor;
+uniform sampler2D opaqueDepth;
+uniform mat4 invView;
+uniform mat4 invProj;
+uniform mat4 view;
+uniform mat4 projection;
+uniform bool uEnableWaterReflections;
+
 // Simple 2D noise for natural wave patterns
 float hash2d(vec2 p) {
     return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -187,7 +196,8 @@ void main() {
         float spec = pow(max(dot(norm, halfDir), 0.0), 64.0); 
 
         // Fresnel effect for transparency and reflection
-        float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
+        float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 2.0);
+        fresnel = mix(0.3, 1.0, fresnel); // Add base reflection so it's always somewhat reflective
         
         // Make water less transparent so colors are highly visible
         alpha = mix(0.85, 1.0, fresnel);
@@ -196,7 +206,56 @@ void main() {
         vec3 waterBase = mix(uWaterDeepColor, uWaterShallowColor, fresnel);
         
         // Blend in sky reflection but keep the base color strong
-        result = mix(waterBase, uSkyColor, fresnel * uWaterSkyBlend);
+        result = mix(waterBase, uSkyColor, fresnel * uWaterSkyBlend * 1.2);
+        
+        if (uEnableWaterReflections) {
+            vec3 reflectDir = normalize(reflect(-viewDir, norm));
+            
+            // Raymarch in view space
+            vec4 startView = view * vec4(FragPos, 1.0);
+            vec3 rayPos = startView.xyz;
+            vec3 rayDir = mat3(view) * reflectDir;
+            
+            float stepSize = 0.25;
+            vec3 rayStep = rayDir * stepSize;
+            
+            vec3 ssrColor = vec3(0.0);
+            float ssrWeight = 0.0;
+            
+            for(int i = 0; i < 40; i++) {
+                rayPos += rayStep;
+                
+                vec4 clip = projection * vec4(rayPos, 1.0);
+                if (clip.w <= 0.0) continue;
+                
+                vec2 ndc = clip.xy / clip.w;
+                vec2 uv = ndc * 0.5 + 0.5;
+                
+                if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+                
+                float depthSample = texture(opaqueDepth, uv).r;
+                
+                // If it's the skybox (depth == 1.0), ignore hit
+                if (depthSample >= 0.9999) continue;
+                
+                float zNDC = depthSample * 2.0 - 1.0;
+                float sampledViewZ = projection[3][2] / (zNDC + projection[2][2]);
+                
+                float zDiff = rayPos.z - sampledViewZ;
+                
+                if(zDiff < 0.0 && zDiff > -1.0) {
+                    ssrColor = texture(opaqueColor, uv).rgb;
+                    vec2 screenEdgeFactor = smoothstep(0.0, 0.1, uv) * smoothstep(1.0, 0.9, uv);
+                    ssrWeight = screenEdgeFactor.x * screenEdgeFactor.y;
+                    break;
+                }
+            }
+            
+            if (ssrWeight > 0.0) {
+                // Blend SSR with sky reflection, boosted for more reflectivity
+                result = mix(result, ssrColor, min(ssrWeight * fresnel * 1.5, 1.0));
+            }
+        }
         
         // Add specular highlight on top
         result += vec3(1.0, 1.0, 1.0) * spec * 0.8;

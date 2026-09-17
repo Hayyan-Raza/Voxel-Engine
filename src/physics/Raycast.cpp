@@ -27,13 +27,13 @@ VoxelChunk* checkGrabbableChunkRaycast(const glm::vec3& startPt, const glm::vec3
     return nullptr;
 }
 
-RaycastResult performWeaponRaycast(const glm::vec3& startPt, const glm::vec3& rayDir, float maxReach, float impulseForce, float damageRadius) {
+RaycastResult performWeaponRaycast(const glm::vec3& startPt, const glm::vec3& rayDir, float maxReach, float impulseForce, float damageRadius, float damageAmount) {
     RaycastResult res;
 
     // 1. Raycast against active ragdolls and mobs
     for (float d = 0.15f; d <= maxReach; d += 0.015f) {
         glm::vec3 pt = startPt + rayDir * d;
-        bool hitMob = damageMobAtWorldPos(pt, rayDir * impulseForce, damageRadius, 100.0f);
+        bool hitMob = damageMobAtWorldPos(pt, rayDir * impulseForce, damageRadius, damageAmount);
         bool hitRagdoll = damageRagdollAtWorldPos(pt, rayDir * impulseForce, damageRadius);
         if (hitMob || hitRagdoll) {
             res.hit = true;
